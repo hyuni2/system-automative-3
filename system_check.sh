@@ -153,7 +153,7 @@ U_16(){
             if [ "$OWNER" != "root" ]; then
                 REASON="/etc/passwd 파일의 소유자가 root가 아닙니다 (현재: $OWNER)."
             fi
-            if [ "$PERM" -gt 644 ]; then
+            if [ "$PERMIT" -gt 644 ]; then
                 if [ -n "$REASON" ]; then
                     REASON="$REASON / 권한이 644보다 높습니다 (현재: $PERMIT). "
                 else
