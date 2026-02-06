@@ -691,6 +691,18 @@ U_23() {
   return 0
 }
 
+U_25() {
+    echo "" >> $resultfile 2>&1
+    echo "▶ U-25(상) | 2. 파일 및 디렉토리 관리 > 2.12 world writable 파일 점검 ◀"  >> $resultfile 2>&1
+    echo " 양호 판단 기준 : world writable 파일이 존재하지 않거나, 존재 시 설정 이유를 인지하고 있는 경우"  >> $resultfile 2>&1
+    if [ `find / -type f -perm -2 2>/dev/null | wc -l` -gt 0 ]; then
+        echo "※ U-25 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " world writable 설정이 되어있는 파일이 있습니다." >> $resultfile 2>&1
+    else
+        echo "※ U-25 결과 : 양호(Good)" >> $resultfile 2>&1
+    fi
+}
+
 U_28() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-28(상) | 2. 파일 및 디렉토리 관리 > 접속 IP 및 포트 제한 ◀"  >> "$resultfile" 2>&1
@@ -776,6 +788,399 @@ U_28() {
   return 0
 }
 
+U_30() {
+    echo "" >> $resultfile 2>&1
+    echo "▶ U-30(중) | 2. 파일 및 디렉토리 관리 > 2.17 UMASK 설정 관리 ◀"  >> $resultfile 2>&1
+    echo " 양호 판단 기준 : UMASK 값이 022 이상으로 설정된 경우" >> $resultfile 2>&1
+    umaks_value=`umask`
+
+    # 현재 세션 umask 설정 점검
+    if [ ${umaks_value:2:1} -lt 2 ]; then
+        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+    elif [ ${umaks_value:3:1} -lt 2 ]; then
+        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+    fi
+
+    # /etc/profile 파일 내 umask 설정 점검
+    if [ ${umaks_value:2:1} -lt 2 ]; then
+        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+    elif [ ${umaks_value:3:1} -lt 2 ]; then
+        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+    fi
+    # /etc/profile 파일 내 umask 설정 점검
+    # 변수로 선언한 umask, 즉 umask=값 형태는 무시
+    if [ -f /etc/profile ]; then
+        umaks_value=($(
+            grep -vE '^[[:space:]]*#' /etc/profile \
+            | grep -i 'umask' \
+            | grep -vE 'if|=' \
+            | awk '{print $2}'
+        ))
+        for ((i=0; i<${#umaks_value[@]}; i++))
+        do
+            if [ ${#umaks_value[$i]} -eq 2 ]; then
+                if [ ${umaks_value[$i]:0:1} -lt 2 ]; then
+                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                    echo " /etc/profile 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                elif [ ${umaks_value[$i]:1:1} -lt 2 ]; then
+                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                    echo " /etc/profile 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                fi
+            elif [ ${#umaks_value[$i]} -eq 4 ]; then
+                if [ ${umaks_value[$i]:2:1} -lt 2 ]; then
+                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                    echo " /etc/profile 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                elif [ ${umaks_value[$i]:3:1} -lt 2 ]; then
+                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                    echo " /etc/profile 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                fi
+            elif [ ${#umaks_value[$i]} -eq 3 ]; then
+                if [ ${umaks_value[$i]:1:1} -lt 2 ]; then
+                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                    echo " /etc/profile 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                elif [ ${umaks_value[$i]:2:1} -lt 2 ]; then
+                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                    echo " /etc/profile 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                fi
+            elif [ ${#umaks_value[$i]} -eq 1 ]; then
+                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                echo " /etc/profile 파일에 umask 값이 0022 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+            else
+                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                echo " /etc/profile 파일에 설정된 umask 값이 보안 설정에 부합하지 않습니다." >> $resultfile 2>&1
+            fi
+        done
+    fi
+
+    # /etc/bashrc, /etc/csh.login, /etc/csh.cshrc 파일 내 umask 설정 확인
+    umask_settings_files=("/etc/bashrc" "/etc/csh.login" "/etc/csh.cshrc")
+    for ((i=0; i<${#umask_settings_files[@]}; i++))
+    do
+        if [ -f ${umask_settings_files[$i]} ]; then
+            file_umask_count=`grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l`
+            if [ $file_umask_count -gt 0 ]; then
+                umaks_value=(`grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'`)
+                for ((j=0; j<${#umaks_value[@]}; j++))
+                do
+                    if [ ${#umaks_value[$j]} -eq 2 ]; then
+                        if [ ${umaks_value[$j]:0:1} -lt 2 ]; then
+                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                            echo " ${umask_settings_files[$i]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                        elif [ ${umaks_value[$j]:1:1} -lt 2 ]; then
+                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                            echo " ${umask_settings_files[$i]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                        fi
+                    elif [ ${#umaks_value[$j]} -eq 4 ]; then
+                        if [ ${umaks_value[$j]:2:1} -lt 2 ]; then
+                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                            echo " ${umask_settings_files[$i]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                        elif [ ${umaks_value[$j]:3:1} -lt 2 ]; then
+                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                            echo " ${umask_settings_files[$i]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                        fi
+                    elif [ ${#umaks_value[$j]} -eq 3 ]; then
+                        if [ ${umaks_value[$j]:1:1} -lt 2 ]; then
+                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                            echo " ${umask_settings_files[$i]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                        elif [ ${umaks_value[$j]:2:1} -lt 2 ]; then
+                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                            echo " ${umask_settings_files[$i]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                        fi
+                    elif [ ${#umaks_value[$j]} -eq 1 ]; then
+                        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                        echo " ${umask_settings_files[$i]} 파일에 umask 값이 0022 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                    else
+                        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                        echo " ${umask_settings_files[$i]} 파일에 설정된 umask 값이 보안 설정에 부합하지 않습니다." >> $resultfile 2>&1
+                    fi
+                done
+            fi
+        fi
+    done
+
+    # 사용자 홈 디렉터리 설정 파일에서 umask 설정 확인
+    user_homedirectory_path=(`awk -F : '$7!="/bin/false" && $7!="/sbin/nologin" && $6!=null {print $6}' /etc/passwd | uniq`)
+    user_homedirectory_path2=(/home/*)
+    for ((i=0; i<${#user_homedirectory_path2[@]}; i++))
+    do
+        user_homedirectory_path[${#user_homedirectory_path[@]}]=${user_homedirectory_path2[$i]}
+    done
+    umask_settings_files=(".cshrc" ".profile" ".login" ".bashrc" ".kshrc")
+    for ((i=0; i<${#user_homedirectory_path[@]}; i++))
+    do
+        for ((j=0; j<${#umask_settings_files[@]}; j++))
+        do
+            if [ -f ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} ]; then
+                user_homedirectory_setting_umask_count=`grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l`
+                if [ $user_homedirectory_setting_umask_count -gt 0 ]; then
+                    umaks_value=(`grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'`)
+                    for ((k=0; k<${#umaks_value[@]}; k++))
+                    do
+                        if [ ${#umaks_value[$k]} -eq 2 ]; then
+                            if [ ${umaks_value[$k]:0:1} -lt 2 ]; then
+                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                            elif [ ${umaks_value[$k]:1:1} -lt 2 ]; then
+                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                            fi
+                        elif [ ${#umaks_value[$k]} -eq 4 ]; then
+                            if [ ${umaks_value[$k]:2:1} -lt 2 ]; then
+                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                            elif [ ${umaks_value[$k]:3:1} -lt 2 ]; then
+                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                            fi
+                        elif [ ${#umaks_value[$k]} -eq 3 ]; then
+                            if [ ${umaks_value[$k]:1:1} -lt 2 ]; then
+                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                            elif [ ${umaks_value[$k]:2:1} -lt 2 ]; then
+                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                            fi
+                        elif [ ${#umaks_value[$k]} -eq 1 ]; then
+                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                            echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 umask 값이 0022 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
+                        else
+                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                            echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 설정된 umask 값이 보안 설정에 부합하지 않습니다." >> $resultfile 2>&1
+                        fi
+                    done
+                fi
+            fi
+        done
+    done
+    echo "※ U-30 결과 : 양호(Good)" >> $resultfile 2>&1
+}
+
+U_35() {
+    vuln_flag=0
+    evidence_flag=0
+    echo "" >> "$resultfile" 2>&1
+    echo "▶ U-35(상) | 3. 서비스 관리 > 3.2 공유 서비스에 대한 익명 접근 제한 설정 ◀"  >> "$resultfile" 2>&1
+    echo " 양호 판단 기준 : 공유 서비스에 대해 익명 접근을 제한한 경우" >> "$resultfile" 2>&1
+    print_vuln_header_once() {
+        if [ "$evidence_flag" -eq 0 ]; then
+            echo "※ U-35 결과 : 취약(Vulnerable)" >> "$resultfile"
+            evidence_flag=1
+        fi
+    }
+    is_listening_port() {
+        ss -lnt 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$1$"
+    }
+    is_active_service() {
+        systemctl is-active "$1" >/dev/null 2>&1
+    }
+    # FTP 점검 (vsftp / proftp)
+    ftp_checked=0
+    ftp_running=0
+    ftp_pkg=0
+    ftp_conf_found=0
+    if command -v rpm >/dev/null 2>&1; then
+        rpm -q vsftpd >/dev/null 2>&1 && ftp_pkg=1
+        rpm -q proftpd >/dev/null 2>&1 && ftp_pkg=1
+        rpm -q proftpd-core >/dev/null 2>&1 && ftp_pkg=1
+    fi
+    if is_active_service vsftpd || is_active_service proftpd; then
+        ftp_running=1
+    fi
+    if is_listening_port 21; then
+        ftp_running=1
+    fi
+    VSFTPD_FILES=()
+    PROFTPD_FILES=()
+    for f in /etc/vsftpd/vsftpd.conf /etc/vsftpd.conf; do
+        [ -f "$f" ] && VSFTPD_FILES+=("$f")
+    done
+    for f in /etc/proftpd/proftpd.conf /etc/proftpd.conf /etc/proftpd.d/proftpd.conf; do
+        [ -f "$f" ] && PROFTPD_FILES+=("$f")
+    done
+    if command -v rpm >/dev/null 2>&1; then
+        if rpm -q vsftpd >/dev/null 2>&1; then
+            while IFS= read -r f; do
+                [ -f "$f" ] && VSFTPD_FILES+=("$f")
+            done < <(rpm -qc vsftpd 2>/dev/null)
+        fi
+        for pkg in proftpd proftpd-core; do
+            if rpm -q "$pkg" >/dev/null 2>&1; then
+                while IFS= read -r f; do
+                    [ -f "$f" ] && PROFTPD_FILES+=("$f")
+                done < <(rpm -qc "$pkg" 2>/dev/null)
+            fi
+        done
+    fi
+    dedup() { printf "%s\n" "$@" | awk 'NF && !seen[$0]++'; }
+    VSFTPD_FILES=( $(dedup "${VSFTPD_FILES[@]}") )
+    PROFTPD_FILES=( $(dedup "${PROFTPD_FILES[@]}") )
+    if [ "${#VSFTPD_FILES[@]}" -gt 0 ] || [ "${#PROFTPD_FILES[@]}" -gt 0 ]; then
+        ftp_conf_found=1
+    fi
+    if [ "$ftp_conf_found" -eq 1 ] || [ "$ftp_running" -eq 1 ] || [ "$ftp_pkg" -eq 1 ]; then
+        ftp_checked=1
+    fi
+    if [ "$ftp_checked" -eq 1 ]; then
+        for conf in "${PROFTPD_FILES[@]}"; do
+            [ -f "$conf" ] || continue
+            block_hit=$(
+                awk '
+                    BEGIN{inblk=0;hit=0}
+                    /^[[:space:]]*#/ {next}
+                    /<Anonymous[[:space:]>]/ {inblk=1}
+                    inblk && /<\/Anonymous>/ {inblk=0}
+                    inblk && ($1 ~ /^User$/ || $1 ~ /^UserAlias$/) {hit=1}
+                    END{print hit}
+                ' "$conf" 2>/dev/null
+            )
+            if [ "$block_hit" = "1" ]; then
+                vuln_flag=1
+                print_vuln_header_once
+                echo " $conf 파일에서 익명(Anonymous) FTP 설정 블록이 존재합니다." >> "$resultfile"
+            fi
+        done
+        for conf in "${VSFTPD_FILES[@]}"; do
+            [ -f "$conf" ] || continue
+            last_val=$(
+                grep -i '^[[:space:]]*anonymous_enable[[:space:]]*=' "$conf" 2>/dev/null \
+                | grep -v '^[[:space:]]*#' \
+                | tail -n 1 \
+                | awk -F= '{gsub(/[[:space:]]/,"",$2); print tolower($2)}'
+            )
+            if [ -n "$last_val" ] && [ "$last_val" = "yes" ]; then
+                vuln_flag=1
+                print_vuln_header_once
+                echo " $conf 파일에서 익명 FTP 접속 허용(anonymous_enable=YES)." >> "$resultfile"
+            fi
+        done
+        if [ "$ftp_conf_found" -eq 0 ] && [ "$ftp_running" -eq 1 ]; then
+            vuln_flag=1
+            print_vuln_header_once
+            echo " FTP 서비스가 동작 중이나(vsftpd/proftpd 또는 21/tcp 리슨), 설정 파일을 확인할 수 없습니다." >> "$resultfile"
+        fi
+    fi
+
+    # NFS 점검
+    nfs_checked=0
+    nfs_running=0
+    nfs_conf_found=0
+    [ -f /etc/exports ] && nfs_conf_found=1
+    is_active_service nfs-server && nfs_running=1
+    nfs_pkg=0
+    if command -v rpm >/dev/null 2>&1; then
+        rpm -q nfs-utils >/dev/null 2>&1 && nfs_pkg=1
+    fi
+    if [ "$nfs_conf_found" -eq 1 ] || [ "$nfs_running" -eq 1 ] || [ "$nfs_pkg" -eq 1 ]; then
+        nfs_checked=1
+    fi
+    if [ "$nfs_checked" -eq 1 ]; then
+        if [ -f /etc/exports ]; then
+            cnt_no_root=$(
+                grep -v '^[[:space:]]*#' /etc/exports 2>/dev/null \
+                | grep -E '(^|[[:space:]\(,])no_root_squash([[:space:]\),]|$)' \
+                | wc -l
+            )
+            if [ "$cnt_no_root" -gt 0 ]; then
+                vuln_flag=1
+                print_vuln_header_once
+                echo " /etc/exports 에 no_root_squash 설정이 존재합니다." >> "$resultfile"
+            fi
+            cnt_star=$(
+                grep -v '^[[:space:]]*#' /etc/exports 2>/dev/null \
+                | grep -E '(^|[[:space:]])\*([[:space:]\(]|$)' \
+                | wc -l
+            )
+            if [ "$cnt_star" -gt 0 ]; then
+                vuln_flag=1
+                print_vuln_header_once
+                echo " /etc/exports 전체 호스트(*) 공유 설정이 존재합니다." >> "$resultfile"
+            fi
+        else
+            if [ "$nfs_running" -eq 1 ]; then
+                vuln_flag=1
+                print_vuln_header_once
+                echo " NFS 서비스가 동작 중이나(nfs-server active), /etc/exports 파일이 존재하지 않습니다." >> "$resultfile"
+            fi
+        fi
+    fi
+
+    # Samba 점검
+    smb_checked=0
+    smb_running=0
+    smb_conf_found=0
+    [ -f /etc/samba/smb.conf ] && smb_conf_found=1
+    (is_active_service smb || is_active_service nmb) && smb_running=1
+    smb_pkg=0
+    if command -v rpm >/dev/null 2>&1; then
+        rpm -q samba >/dev/null 2>&1 && smb_pkg=1
+    fi
+    if [ "$smb_conf_found" -eq 1 ] || [ "$smb_running" -eq 1 ] || [ "$smb_pkg" -eq 1 ]; then
+        smb_checked=1
+    fi
+    if [ "$smb_checked" -eq 1 ]; then
+        if [ -f /etc/samba/smb.conf ]; then
+            smb_hits=$(
+                grep -v '^[[:space:]]*#' /etc/samba/smb.conf 2>/dev/null \
+                | grep -Ei '^[[:space:]]*(guest[[:space:]]+ok|public|map[[:space:]]+to[[:space:]]+guest|security)[[:space:]]*='
+            )
+            if [ -n "$smb_hits" ]; then
+                cnt_guest=$(echo "$smb_hits" | grep -Ei '^[[:space:]]*guest[[:space:]]+ok[[:space:]]*=[[:space:]]*yes' | wc -l)
+                cnt_public=$(echo "$smb_hits" | grep -Ei '^[[:space:]]*public[[:space:]]*=[[:space:]]*yes' | wc -l)
+                cnt_share=$(echo "$smb_hits" | grep -Ei '^[[:space:]]*security[[:space:]]*=[[:space:]]*share' | wc -l)
+                cnt_map=$(echo "$smb_hits" | grep -Ei '^[[:space:]]*map[[:space:]]+to[[:space:]]+guest[[:space:]]*=' | wc -l)
+                if [ "$cnt_guest" -gt 0 ] || [ "$cnt_public" -gt 0 ] || [ "$cnt_share" -gt 0 ] || [ "$cnt_map" -gt 0 ]; then
+                    vuln_flag=1
+                    print_vuln_header_once
+                    echo " /etc/samba/smb.conf 익명/게스트 접근 유발 가능 설정이 존재합니다." >> "$resultfile"
+                    echo "$smb_hits" | head -n 5 | sed 's/^/  - /' >> "$resultfile"
+                fi
+            fi
+        else
+            if [ "$smb_running" -eq 1 ]; then
+                vuln_flag=1
+                print_vuln_header_once
+                echo " Samba 서비스가 동작 중이나(smb/nmb active), /etc/samba/smb.conf 파일이 존재하지 않습니다." >> "$resultfile"
+            fi
+        fi
+    fi
+    if [ "$vuln_flag" -eq 0 ]; then
+        echo "※ U-35 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    fi
+}
+
+U_40() {
+    echo ""  >> $resultfile 2>&1
+    echo "▶ U-40(상) | 3. 서비스 관리 > 3.7 NFS 접근 통제 ◀"  >> $resultfile 2>&1
+    echo " 양호 판단 기준 : 불필요한 NFS 서비스를 사용하지 않거나, 불가피하게 사용 시 everyone 공유를 제한한 경우" >> $resultfile 2>&1
+    if [ `ps -ef | grep -iE 'nfs|rpc.statd|statd|rpc.lockd|lockd' | grep -ivE 'grep|kblockd|rstatd|' | wc -l` -gt 0 ]; then
+        if [ -f /etc/exports ]; then
+            etc_exports_all_count=`grep -vE '^#|^\s#' /etc/exports | grep '/' | grep '*' | wc -l`
+            etc_exports_insecure_count=`grep -vE '^#|^\s#' /etc/exports | grep '/' | grep -i 'insecure' | wc -l`
+            etc_exports_directory_count=`grep -vE '^#|^\s#' /etc/exports | grep '/' | wc -l`
+            etc_exports_squash_count=`grep -vE '^#|^\s#' /etc/exports | grep '/' | grep -iE 'root_squash|all_squash' | wc -l`
+            if [ $etc_exports_all_count -gt 0 ]; then
+                echo "※ U-40 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                echo " /etc/exports 파일에 '*' 설정이 있습니다." >> $resultfile 2>&1
+                echo " ### '*' 설정 = 모든 클라이언트에 대해 전체 네트워크 공유 허용" >> $resultfile 2>&1
+            elif [ $etc_exports_insecure_count -gt 0 ]; then
+                echo "※ U-40 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                echo " /etc/exports 파일에 'insecure' 옵션이 설정되어 있습니다." >> $resultfile 2>&1
+            else
+                if [ $etc_exports_directory_count -ne $etc_exports_squash_count ]; then
+                    echo "※ U-40 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                    echo " /etc/exports 파일에 'root_squash' 또는 'all_squash' 옵션이 설정되어 있지 않습니다." >> $resultfile 2>&1
+                fi
+            fi
+        fi
+    else
+        echo "※ U-40 결과 : 양호(Good)" >> $resultfile 2>&1
+    fi
+}
+
 U_01
 U_03
 U_05
@@ -789,4 +1194,8 @@ U_16
 U_18
 U_20
 U_23
+U_25
 U_28
+U_30
+U_35
+U_40
