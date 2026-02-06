@@ -43,14 +43,15 @@ U_01() {
 }
 
 U_05() {
-    echo "▶ U-05(상) | 1. 계정관리 > 1.5 root 이외의 UID가 '0' 금지 ◀"  >> $resultfile 2>&1
-    echo " 양호 판단 기준 : root 계정과 동일한 UID를 갖는 계정이 존재하지 않는 경우" >> $resultfile 2>&1
+    echo "" >> $result 2>&1
+    echo "▶ U-05(상) | 1. 계정관리 > 1.5 root 이외의 UID가 '0' 금지 ◀"  >> $result 2>&1
+    echo " 양호 판단 기준 : root 계정과 동일한 UID를 갖는 계정이 존재하지 않는 경우" >> $result 2>&1
     if [ -f /etc/passwd ]; then
         if [ `awk -F : '$3==0 {print $1}' /etc/passwd | grep -vx 'root' | wc -l` -gt 0 ]; then
-            echo "※ U-44 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-            echo " root 계정과 동일한 UID(0)를 갖는 계정이 존재합니다." >> $resultfile 2>&1
+            echo "※ U-44 결과 : 취약(Vulnerable)" >> $result 2>&1
+            echo " root 계정과 동일한 UID(0)를 갖는 계정이 존재합니다." >> $result 2>&1
         else
-            echo "※ U-44 결과 : 양호(Good)" >> $resultfile 2>&1
+            echo "※ U-44 결과 : 양호(Good)" >> $result 2>&1
         fi
     fi
 }
@@ -99,15 +100,16 @@ U_06(){
 }
 
 U_10() {
-    echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀"  >> $resultfile 2>&1
-    echo " 양호 판단 기준 : 동일한 UID로 설정된 사용자 계정이 존재하지 않는 경우" >> $resultfile 2>&1
+    echo "" >> $result 2>&1
+    echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀"  >> $result 2>&1
+    echo " 양호 판단 기준 : 동일한 UID로 설정된 사용자 계정이 존재하지 않는 경우" >> $result 2>&1
     if [ -f /etc/passwd ]; then
         if [ `awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l` -gt 0 ]; then
-            echo "※ U-10 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-            echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> $resultfile 2>&1
+            echo "※ U-10 결과 : 취약(Vulnerable)" >> $result 2>&1
+            echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> $result 2>&1
         fi
     fi
-    echo "※ U-10 결과 : 양호(Good)" >> $resultfile 2>&1
+    echo "※ U-10 결과 : 양호(Good)" >> $result 2>&1
 }
 
 U_11(){
@@ -158,13 +160,14 @@ U_11(){
 }
 
 U_15() {
-    echo "▶ U-15(상) | 2. 파일 및 디렉토리 관리 > 2.2 파일 및 디렉터리 소유자 설정 ◀"  >> $resultfile 2>&1
-    echo " 양호 판단 기준 : 소유자가 존재하지 않는 파일 및 디렉터리가 존재하지 않는 경우"  >> $resultfile 2>&1
+    echo "" >> $result 2>&1
+    echo "▶ U-15(상) | 2. 파일 및 디렉토리 관리 > 2.2 파일 및 디렉터리 소유자 설정 ◀"  >> $result 2>&1
+    echo " 양호 판단 기준 : 소유자가 존재하지 않는 파일 및 디렉터리가 존재하지 않는 경우"  >> $result 2>&1
     if [ `find / \( -nouser -or -nogroup \) 2>/dev/null | wc -l` -gt 0 ]; then
-        echo "※ U-15 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-        echo " 소유자가 존재하지 않는 파일 및 디렉터리가 존재합니다." >> $resultfile 2>&1
+        echo "※ U-15 결과 : 취약(Vulnerable)" >> $result 2>&1
+        echo " 소유자가 존재하지 않는 파일 및 디렉터리가 존재합니다." >> $result 2>&1
     else
-        echo "※ U-15 결과 : 양호(Good)" >> $resultfile 2>&1
+        echo "※ U-15 결과 : 양호(Good)" >> $result 2>&1
     fi
 }
 
@@ -228,8 +231,9 @@ U_20() {
     #
     # 아래는 /etc/systemd/system, /usr/lib/systemd/system 점검 스크립트
     # ------------------------------------------------------------------------
-    echo "▶ U-20(상) | 2. 파일 및 디렉토리 관리 > 2.7 systemd *.socket, *.service 파일 소유자 및 권한 설정 ◀"  >> $resultfile 2>&1
-    echo " 양호 판단 기준 : systemd *.socket, *.service 파일의 소유자가 root이고, 권한이 644 이하인 경우"  >> $resultfile 2>&1
+    echo "" >> $result 2>&1
+    echo "▶ U-20(상) | 2. 파일 및 디렉토리 관리 > 2.7 systemd *.socket, *.service 파일 소유자 및 권한 설정 ◀"  >> $result 2>&1
+    echo " 양호 판단 기준 : systemd *.socket, *.service 파일의 소유자가 root이고, 권한이 644 이하인 경우"  >> $result 2>&1
     file_exists_count=0
     # /usr/lib/systemd/system 점검
     if [ -d /usr/lib/systemd/system ]; then
@@ -241,11 +245,11 @@ U_20() {
                 owner=$(stat -c %U "$file")
                 perm=$(stat -c %a "$file")
                 if [ "$owner" != "root" ]; then
-                    echo "※ U-20 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                    echo " $file 파일의 소유자가 root가 아닙니다." >> $resultfile 2>&1
+                    echo "※ U-20 결과 : 취약(Vulnerable)" >> $result 2>&1
+                    echo " $file 파일의 소유자가 root가 아닙니다." >> $result 2>&1
                 elif [ "$perm" -gt 644 ]; then
-                    echo "※ U-20 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                    echo " $file 파일의 권한이 644 초과입니다." >> $resultfile 2>&1
+                    echo "※ U-20 결과 : 취약(Vulnerable)" >> $result 2>&1
+                    echo " $file 파일의 권한이 644 초과입니다." >> $result 2>&1
                 fi
             done
         fi
@@ -260,20 +264,20 @@ U_20() {
                 owner=$(stat -c %U "$file")
                 perm=$(stat -c %a "$file")
                 if [ "$owner" != "root" ]; then
-                    echo "※ U-20 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                    echo " $file 파일의 소유자가 root가 아닙니다." >> $resultfile 2>&1
+                    echo "※ U-20 결과 : 취약(Vulnerable)" >> $result 2>&1
+                    echo " $file 파일의 소유자가 root가 아닙니다." >> $result 2>&1
                 elif [ "$perm" -gt 644 ]; then
-                    echo "※ U-20 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                    echo " $file 파일의 권한이 644 초과입니다." >> $resultfile 2>&1
+                    echo "※ U-20 결과 : 취약(Vulnerable)" >> $result 2>&1
+                    echo " $file 파일의 권한이 644 초과입니다." >> $result 2>&1
                 fi
             done
         fi
     fi
     if [ $file_exists_count -eq 0 ]; then
-        echo "※ U-20 결과 : N/A" >> $resultfile 2>&1
-        echo " systemd socket/service 파일이 없습니다." >> $resultfile 2>&1
+        echo "※ U-20 결과 : N/A" >> $result 2>&1
+        echo " systemd socket/service 파일이 없습니다." >> $result 2>&1
     else
-        echo "※ U-20 결과 : 양호(Good)" >> $resultfile 2>&1
+        echo "※ U-20 결과 : 양호(Good)" >> $result 2>&1
     fi
 }
 
