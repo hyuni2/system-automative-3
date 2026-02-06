@@ -1,11 +1,11 @@
 #!/bin/bash
 
-result="results.txt"
+resultfile="Results_$(date '+%F_%H:%M:%S').txt"
 
 U_01() {
-    echo "" >> $result 2>&1
-    echo "▶ U-01(상) | 1. 계정관리 > 1.1 root 계정 원격접속 제한 ◀" >> $result 2>&1
-    echo " 양호 판단 기준 : 원격터미널 서비스를 사용하지 않거나, 사용 시 root 직접 접속을 차단한 경우" >> $result 2>&1
+    echo "" >> $resultfile 2>&1
+    echo "▶ U-01(상) | 1. 계정관리 > 1.1 root 계정 원격접속 제한 ◀" >> $resultfile 2>&1
+    echo " 양호 판단 기준 : 원격터미널 서비스를 사용하지 않거나, 사용 시 root 직접 접속을 차단한 경우" >> $resultfile 2>&1
 
     VULN=0
     REASON=""
@@ -35,10 +35,10 @@ U_01() {
 
     # 3. 결과 출력 
     if [ $VULN -eq 1 ]; then
-        echo "※ U-01 결과 : 취약(Vulnerable)" >> $result 2>&1
-        echo " $REASON" >> $result 2>&1
+        echo "※ U-01 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " $REASON" >> $resultfile 2>&1
     else
-        echo "※ U-01 결과 : 양호(Good)" >> $result 2>&1
+        echo "※ U-01 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
 
@@ -56,9 +56,9 @@ U_05() {
 }
 
 U_06(){
-    echo "" >> $result 2>&1
-    echo "▶ U-06(상) | 1. 계정관리 > 1.6 사용자 계정 su 기능 제한 ◀" >> $result 2>&1
-    echo " 양호 판단 기준 : su 명령어를 특정 그룹에 속한 사용자만 사용하도록 제한된 경우 ※ 일반 사용자 계정 없이 root 계정만 사용하는 경우 su 명령어 사용 제한 불필요" >> $result 2>&1
+    echo "" >> $resultfile 2>&1
+    echo "▶ U-06(상) | 1. 계정관리 > 1.6 사용자 계정 su 기능 제한 ◀" >> $resultfile 2>&1
+    echo " 양호 판단 기준 : su 명령어를 특정 그룹에 속한 사용자만 사용하도록 제한된 경우 ※ 일반 사용자 계정 없이 root 계정만 사용하는 경우 su 명령어 사용 제한 불필요" >> $resultfile 2>&1
 
     VULN=0
     REASON=""
@@ -91,10 +91,10 @@ U_06(){
 
     # 4. 결과 출력
     if [ $VULN -eq 1 ]; then
-        echo "※ U-06 결과 : 취약(Vulnerable)" >> $result 2>&1
-        echo " $REASON" >> $result 2>&1
+        echo "※ U-06 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " $REASON" >> $resultfile 2>&1
     else
-        echo "※ U-06 결과 : 양호(Good)" >> $result 2>&1
+        echo "※ U-06 결과 : 양호(Good)" >> $resultfile 2>&1
     fi 
 }
 
@@ -111,9 +111,9 @@ U_10() {
 }
 
 U_11(){
-    echo "" >> $result 2>&1
-    echo "▶ U-11(하) | 1. 계정관리 > 1.11 사용자 shell 점검 ◀" >> $result 2>&1
-    echo " 양호 판단 기준 : 로그인이 필요하지 않은 계정에 /bin/false(/sbin/nologin) 쉘이 부여된 경우" >> $result 2>&1
+    echo "" >> $resultfile 2>&1
+    echo "▶ U-11(하) | 1. 계정관리 > 1.11 사용자 shell 점검 ◀" >> $resultfile 2>&1
+    echo " 양호 판단 기준 : 로그인이 필요하지 않은 계정에 /bin/false(/sbin/nologin) 쉘이 부여된 경우" >> $resultfile 2>&1
 
     VULN=0
     REASON=""
@@ -150,10 +150,10 @@ U_11(){
 
     # 4. 결과 출력
     if [ $VULN -eq 1 ]; then
-        echo "※ U-11 결과 : 취약(Vulnerable)" >> $result 2>&1
-        echo " $REASON" >> $result 2>&1
+        echo "※ U-11 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " $REASON" >> $resultfile 2>&1
     else
-        echo "※ U-11 결과 : 양호(Good)" >> $result 2>&1
+        echo "※ U-11 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
 
@@ -169,9 +169,9 @@ U_15() {
 }
 
 U_16(){
-    echo "" >> $result 2>&1
-    echo "▶ U-16(상) | 2. 파일 및 디렉토리 관리 > 2.3 /etc/passwd 파일 소유자 및 권한 설정 ◀" >> $result 2>&1
-    echo " 양호 판단 기준 : /etc/passwd 파일의 소유자가 root이고, 권한이 644 이하인 경우" >> $result 2>&1
+    echo "" >> $resultfile 2>&1
+    echo "▶ U-16(상) | 2. 파일 및 디렉토리 관리 > 2.3 /etc/passwd 파일 소유자 및 권한 설정 ◀" >> $resultfile 2>&1
+    echo " 양호 판단 기준 : /etc/passwd 파일의 소유자가 root이고, 권한이 644 이하인 경우" >> $resultfile 2>&1
 
     VULN=0
     REASON=""
@@ -204,10 +204,10 @@ U_16(){
 
     # 4. 결과 출력
     if [ $VULN -eq 1 ]; then
-        echo "※ U-16 결과 : 취약(Vulnerable)" >> $result 2>&1
-        echo " $REASON" >> $result 2>&1
+        echo "※ U-16 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " $REASON" >> $resultfile 2>&1
     else
-        echo "※ U-16 결과 : 양호(Good)" >> $result 2>&1
+        echo "※ U-16 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 
 }
