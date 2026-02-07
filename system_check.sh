@@ -1373,6 +1373,43 @@ U_40() {
     fi
 }
 
+U_45() {
+    # 2026/02/06 기준 sendmail 최신 버전 : 8.18.2 를 기준으로 점검
+    echo ""  >> $resultfile 2>&1
+    echo "▶ U-45(상) | 3. 서비스 관리 > 3.12 메일 서비스 버전 점검 ◀"  >> $resultfile 2>&1
+    echo " 양호 판단 기준 : 메일 서비스 버전이 최신버전인 경우" >> $resultfile 2>&1
+    if [ -f /etc/services ]; then
+        smtp_port_count=`grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}' | wc -l`
+        if [ $smtp_port_count -gt 0 ]; then
+            smtp_port=(`grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}'`)
+            for ((i=0; i<${#smtp_port[@]}; i++))
+            do
+                netstat_smtp_count=`netstat -nat 2>/dev/null | grep -w 'tcp' | grep -Ei 'listen|established|syn_sent|syn_received' | grep ":${smtp_port[$i]} " | wc -l`
+                if [ $netstat_smtp_count -gt 0 ]; then
+                    rpm_smtp_version=`rpm -qa 2>/dev/null | grep 'sendmail' | awk -F 'sendmail-' '{print $2}'`
+                    dnf_smtp_version=`dnf list installed sendmail 2>/dev/null | grep -v 'Installed Packages' | awk '{print $2}'`
+                    if [[ $rpm_smtp_version != 8.18.2* ]] && [[ $dnf_smtp_version != 8.18.2* ]]; then
+                        echo "※ U-45 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                        echo " 메일 서비스 버전이 최신 버전(8.18.2)이 아닙니다." >> $resultfile 2>&1
+                        return 0
+                    fi
+                fi
+            done
+        fi
+    fi
+    ps_smtp_count=`ps -ef | grep -iE 'smtp|sendmail' | grep -v 'grep' | wc -l`
+    if [ $ps_smtp_count -gt 0 ]; then
+        rpm_smtp_version=`rpm -qa 2>/dev/null | grep 'sendmail' | awk -F 'sendmail-' '{print $2}'`
+        dnf_smtp_version=`dnf list installed sendmail 2>/dev/null | grep -v 'Installed Packages' | awk '{print $2}'`
+        if [[ $rpm_smtp_version != 8.18.2* ]] && [[ $dnf_smtp_version != 8.18.2* ]]; then
+            echo "※ U-45 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+            echo " 메일 서비스 버전이 최신 버전(8.18.2)이 아닙니다." >> $resultfile 2>&1
+            return 0
+        fi
+    fi
+    echo "※ U-45 결과 : 양호(Good)" >> $resultfile 2>&1
+}
+
 U_43() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-43(상) | UNIX > 3. 서비스 관리 > NIS, NIS+ 점검 ◀"  >> "$resultfile" 2>&1
@@ -1643,6 +1680,270 @@ U_48() {
   return 0
 }
 
+U_50() {
+    echo ""  >> $resultfile 2>&1
+    echo "▶ U-50(상) | 3. 서비스 관리 > 3.17 DNS Zone Transfer 설정 ◀"  >> $resultfile 2>&1
+    echo " 양호 판단 기준 : Zone Transfer를 허가된 사용자에게만 허용한 경우" >> $resultfile 2>&1
+    ps_dns_count=`ps -ef | grep -i 'named' | grep -v 'grep' | wc -l`
+    if [ $ps_dns_count -gt 0 ]; then
+        if [ -f /etc/named.conf ]; then
+            etc_namedconf_allowtransfer_count=`grep -vE '^#|^\s#' /etc/named.conf | grep -i 'allow-transfer' | grep -i 'any' | wc -l`
+            if [ $etc_namedconf_allowtransfer_count -gt 0 ]; then
+                echo "※ U-50 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                echo " /etc/named.conf 파일에 allow-transfer { any; } 설정이 있습니다." >> $resultfile 2>&1
+            fi
+        fi
+    fi
+    echo "※ U-50 결과 : 양호(Good)" >> $resultfile 2>&1
+}
+
+U_55() {
+    echo ""  >> $resultfile 2>&1
+    echo "▶ U-55(중) | 3. 서비스 관리 > 3.22 FTP 계정 Shell 제한 ◀" >> $resultfile 2>&1
+    echo " 양호 판단 기준 : ftp 계정에 /bin/false 쉘이 부여되어 있는 경우" >> $resultfile 2>&1
+    # FTP 서비스 설치 여부 확인
+    if ! rpm -qa | egrep -qi 'vsftpd|proftpd'; then
+        echo "※ U-55 결과 : 양호(Good)" >> $resultfile 2>&1
+        echo " FTP 서비스가 미설치되어 있습니다." >> $resultfile 2>&1
+        return 0
+    fi
+    # ftp, vsftpd, proftpd 전부 점검
+    ftp_users=("ftp" "vsftpd" "proftpd")
+    ftp_exist=0
+    ftp_vuln=0
+    for user in "${ftp_users[@]}"; do
+        if id "$user" >/dev/null 2>&1; then
+            ftp_exist=1
+            shell=$(grep "^$user:" /etc/passwd | awk -F: '{print $7}')
+            if [[ "$shell" != "/bin/false" && "$shell" != "/sbin/nologin" ]]; then
+                ftp_vuln=1
+            fi
+        fi
+    done
+    if [[ $ftp_exist -eq 0 ]]; then
+        echo "※ U-55 결과 : 양호(Good)" >> $resultfile 2>&1
+        echo " FTP 계정이 존재하지 않습니다." >> $resultfile 2>&1
+    elif [[ $ftp_vuln -eq 1 ]]; then
+        echo "※ U-55 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " ftp 계정에 /bin/false 쉘이 부여되어 있지 않습니다." >> $resultfile 2>&1
+    else
+        echo "※ U-55 결과 : 양호(Good)" >> $resultfile 2>&1
+        echo " ftp 계정에 /bin/false 또는 nologin 쉘이 부여되어 있습니다." >> $resultfile 2>&1
+    fi
+}
+
+U_60() {
+    echo ""  >> $resultfile 2>&1
+    echo " ▶ U-60(중) | 3. 서비스 관리 > 3.27 SNMP Community String 복잡성 설정 ◀"  >> $resultfile 2>&1
+    echo " 양호 판단 기준 : SNMP Community String 기본값인 “public”, “private”이 아닌 영문자, 숫자 포함 10자리 이상 또는 영문자, 숫자, 특수문자 포함 8자리 이상인 경우" >> $resultfile 2>&1
+    vuln_flag=0
+    community_found=0
+    # SNMP 사용 여부 판단 - 미설치 시 양호
+    ps_snmp_count=`ps -ef | grep -iE 'snmpd|snmptrapd' | grep -v 'grep' | wc -l`
+    if [ $ps_snmp_count -eq 0 ]; then
+        echo "※ U-60 결과 : 양호(Good)" >> $resultfile 2>&1
+        echo " SNMP 서비스가 미설치되어있습니다." >> $resultfile 2>&1
+        return 0
+    fi
+    # snmpd.conf 검색
+    snmpdconf_files=()
+    [ -f /etc/snmp/snmpd.conf ] && snmpdconf_files+=("/etc/snmp/snmpd.conf")
+    [ -f /usr/local/etc/snmp/snmpd.conf ] && snmpdconf_files+=("/usr/local/etc/snmp/snmpd.conf")
+    while IFS= read -r f; do
+        snmpdconf_files+=("$f")
+    done < <(find /etc -maxdepth 4 -type f -name 'snmpd.conf' 2>/dev/null | sort -u)
+    if [ ${#snmpdconf_files[@]} -gt 0 ]; then
+        mapfile -t snmpdconf_files < <(printf "%s\n" "${snmpdconf_files[@]}" | awk '!seen[$0]++')
+    fi
+    if [ ${#snmpdconf_files[@]} -eq 0 ]; then
+        echo "※ U-60 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " SNMP 서비스를 사용하고, Community String을 설정하는 파일이 없습니다." >> $resultfile 2>&1
+        return 0
+    fi
+    # 복잡성 판단
+    is_strong_community() {
+        local s="$1"
+        s="${s%\"}"; s="${s#\"}"
+        s="${s%\'}"; s="${s#\'}"
+        # 기본값 금지
+        echo "$s" | grep -qiE '^(public|private)$' && return 1
+        local len=${#s}
+        local has_alpha=0
+        local has_digit=0
+        local has_special=0
+        echo "$s" | grep -qE '[A-Za-z]' && has_alpha=1
+        echo "$s" | grep -qE '[0-9]' && has_digit=1
+        echo "$s" | grep -qE '[^A-Za-z0-9]' && has_special=1
+        # 영문 + 숫자 포함 10자리 이상
+        if [ $has_alpha -eq 1 ] && [ $has_digit -eq 1 ] && [ $len -ge 10 ]; then
+            return 0
+        fi
+        # 영문 + 숫자 + 특수문자 포함 8자리 이상
+        if [ $has_alpha -eq 1 ] && [ $has_digit -eq 1 ] && [ $has_special -eq 1 ] && [ $len -ge 8 ]; then
+            return 0
+        fi
+        return 1
+    }
+    for ((i=0; i<${#snmpdconf_files[@]}; i++))
+    do
+        while IFS= read -r comm; do
+            community_found=1
+            if ! is_strong_community "$comm"; then
+                if [ $vuln_flag -eq 0 ]; then
+                    echo "※ U-60 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                    echo " SNMP Community String이 public/private 이거나 복잡성 기준을 만족하지 않습니다." >> $resultfile 2>&1
+                fi
+                vuln_flag=1
+            fi
+        done < <(grep -vE '^\s*#|^\s*$' ${snmpdconf_files[$i]} 2>/dev/null \
+                | awk 'tolower($1) ~ /^(rocommunity6?|rwcommunity6?)$/ {print $2}' )
+        while IFS= read -r comm; do
+            community_found=1
+            if ! is_strong_community "$comm"; then
+                if [ $vuln_flag -eq 0 ]; then
+                    echo "※ U-60 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                    echo " SNMP Community String이 public/private 이거나 복잡성 기준을 만족하지 않습니다." >> $resultfile 2>&1
+                fi
+                vuln_flag=1
+            fi
+        done < <(grep -vE '^\s*#|^\s*$' ${snmpdconf_files[$i]} 2>/dev/null \
+                | awk 'tolower($1)=="com2sec" {print $4}' )
+    done
+    # community 를 못찾으면, 즉 설정 확인이 불가하면 취약
+    if [ $community_found -eq 0 ]; then
+        echo "※ U-60 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " SNMP 서비스를 사용하나 Community String 설정(rocommunity/rwcommunity/com2sec)을 확인할 수 없습니다." >> $resultfile 2>&1
+        return 0
+    fi
+    if [ $vuln_flag -eq 0 ]; then
+        echo "※ U-60 결과 : 양호(Good)" >> $resultfile 2>&1
+        echo " SNMP Community String이 복잡성 기준을 만족합니다." >> $resultfile 2>&1
+    fi
+}
+
+U_65() {
+    echo ""  >> $resultfile 2>&1
+    echo "▶ U-65(중) | 5. 로그 관리 > 5.1 NTP 및 시각 동기화 설정 ◀"  >> $resultfile 2>&1
+    echo " 양호 판단 기준 : NTP 및 시각 동기화 설정이 기준에 따라 적용된 경우" >> $resultfile 2>&1
+    vuln_flag=0
+    # 사용 중인 시간 동기화 방식 판단
+    # - systemd-timesyncd (timedatectl / systemctl)
+    # - chronyd
+    # - ntpd
+    is_active_service() {
+        local svc="$1"
+        systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "${svc}.service" || return 1
+        systemctl is-active --quiet "${svc}.service" 2>/dev/null
+    }
+    # systemd-timesyncd 기반 NTP 사용 여부
+    timedatectl_ntp=$(timedatectl show -p NTP --value 2>/dev/null | tr -d '\r')
+    time_sync_state=$(timedatectl show -p NTPSynchronized --value 2>/dev/null | tr -d '\r')
+    timesyncd_active=0
+    chronyd_active=0
+    ntpd_active=0
+    is_active_service "systemd-timesyncd" && timesyncd_active=1
+    is_active_service "chronyd" && chronyd_active=1
+    is_active_service "ntpd" && ntpd_active=1
+    if [ $ntpd_active -eq 0 ]; then
+        is_active_service "ntp" && ntpd_active=1
+    fi
+    if [ $timesyncd_active -eq 0 ] && [ $chronyd_active -eq 0 ] && [ $ntpd_active -eq 0 ] && [ "$timedatectl_ntp" != "yes" ]; then
+        echo "※ U-65 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " NTP/시각동기화 서비스(chronyd/ntpd/systemd-timesyncd)가 활성화되어 있지 않습니다." >> $resultfile 2>&1
+        return 0
+    fi
+    # NTP 설정/동기화 상태 점검
+    server_found=0
+    sync_ok=0
+    # CHRONY 점검
+    if [ $chronyd_active -eq 1 ]; then
+        chrony_conf_files=()
+        [ -f /etc/chrony.conf ] && chrony_conf_files+=("/etc/chrony.conf")
+        [ -f /etc/chrony/chrony.conf ] && chrony_conf_files+=("/etc/chrony/chrony.conf")
+        [ -d /etc/chrony.d ] && while IFS= read -r f; do chrony_conf_files+=("$f"); done < <(find /etc/chrony.d -type f 2>/dev/null | sort)
+        [ -d /etc/chrony/conf.d ] && while IFS= read -r f; do chrony_conf_files+=("$f"); done < <(find /etc/chrony/conf.d -type f 2>/dev/null | sort)
+        if [ ${#chrony_conf_files[@]} -gt 0 ]; then
+            mapfile -t chrony_conf_files < <(printf "%s\n" "${chrony_conf_files[@]}" | awk '!seen[$0]++')
+        fi
+        for ((i=0; i<${#chrony_conf_files[@]}; i++)); do
+            if grep -vE '^\s*#|^\s*$' "${chrony_conf_files[$i]}" 2>/dev/null | grep -qiE '^\s*(server|pool)\s+'; then
+                server_found=1
+                break
+            fi
+        done
+        # 동기화 상태 확인
+        if command -v chronyc >/dev/null 2>&1; then
+            if chronyc -n sources 2>/dev/null | grep -qE '^\^\*|^\^\+'; then
+                sync_ok=1
+            fi
+        fi
+    fi
+    # NTPD 점검
+    if [ $server_found -eq 0 ] && [ $ntpd_active -eq 1 ]; then
+        ntp_conf_files=()
+        [ -f /etc/ntp.conf ] && ntp_conf_files+=("/etc/ntp.conf")
+        [ -f /etc/ntp/ntp.conf ] && ntp_conf_files+=("/etc/ntp/ntp.conf")
+        while IFS= read -r f; do
+            ntp_conf_files+=("$f")
+        done < <(find /etc -maxdepth 4 -type f -name 'ntp.conf' 2>/dev/null | sort -u)
+        if [ ${#ntp_conf_files[@]} -gt 0 ]; then
+            mapfile -t ntp_conf_files < <(printf "%s\n" "${ntp_conf_files[@]}" | awk '!seen[$0]++')
+        fi
+        for ((i=0; i<${#ntp_conf_files[@]}; i++)); do
+            if grep -vE '^\s*#|^\s*$' "${ntp_conf_files[$i]}" 2>/dev/null | grep -qiE '^\s*server\s+'; then
+                server_found=1
+                break
+            fi
+        done
+        if command -v ntpq >/dev/null 2>&1; then
+            if ntpq -pn 2>/dev/null | awk 'NR>2{print $1}' | grep -q '^\*'; then
+                sync_ok=1
+            fi
+        fi
+    fi
+    # systemd-timesyncd 점검
+    if [ $server_found -eq 0 ] && { [ $timesyncd_active -eq 1 ] || [ "$timedatectl_ntp" = "yes" ]; }; then
+        ts_conf_found=0
+        if [ -f /etc/systemd/timesyncd.conf ]; then
+            if grep -vE '^\s*#|^\s*$' /etc/systemd/timesyncd.conf 2>/dev/null | grep -qiE '^\s*NTP\s*='; then
+                ts_conf_found=1
+            fi
+        fi
+        if [ $ts_conf_found -eq 0 ] && [ -d /etc/systemd/timesyncd.conf.d ]; then
+            if find /etc/systemd/timesyncd.conf.d -type f -name '*.conf' 2>/dev/null | head -n 1 | grep -q .; then
+                if grep -R -vE '^\s*#|^\s*$' /etc/systemd/timesyncd.conf.d 2>/dev/null | grep -qiE '^\s*NTP\s*='; then
+                    ts_conf_found=1
+                fi
+            fi
+        fi
+        if [ $ts_conf_found -eq 1 ]; then
+            server_found=1
+        fi
+        if [ "$time_sync_state" = "yes" ]; then
+            sync_ok=1
+        fi
+    fi
+    if [ $server_found -eq 0 ]; then
+        echo "※ U-65 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+        echo " NTP/시각동기화 서비스는 활성화되어 있으나, NTP 서버 설정(server/pool/NTP=)을 확인할 수 없습니다." >> $resultfile 2>&1
+        vuln_flag=1
+    else
+        sync_check_available=0
+        command -v chronyc >/dev/null 2>&1 && sync_check_available=1
+        command -v ntpq >/dev/null 2>&1 && sync_check_available=1
+        [ -n "$time_sync_state" ] && sync_check_available=1
+
+        if [ $sync_check_available -eq 1 ] && [ $sync_ok -eq 0 ]; then
+            echo "※ U-65 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+            echo " NTP 서버 설정은 존재하나, 현재 동기화 상태를 정상으로 확인하지 못했습니다." >> $resultfile 2>&1
+            echo " (참고) chronyc sources 또는 ntpq -pn 또는 timedatectl 상태를 확인하세요." >> $resultfile 2>&1
+            vuln_flag=1
+        else
+            echo "※ U-65 결과 : 양호(Good)" >> $resultfile 2>&1
+        fi
+    fi
+}
+
 U_01
 U_03
 U_05
@@ -1664,4 +1965,9 @@ U_35
 U_38
 U_40
 U_43
+U_45
 U_48
+U_50
+U_55
+U_60
+U_65
