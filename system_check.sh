@@ -959,6 +959,55 @@ U_30() {
     echo "※ U-30 결과 : 양호(Good)" >> $resultfile 2>&1
 }
 
+U_33() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-33(하) | UNIX > 2. 파일 및 디렉토리 관리 > 숨겨진 파일 및 디렉토리 검색 및 제거 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 불필요하거나 의심스러운 숨겨진 파일 및 디렉터리를 삭제한 경우" >> "$resultfile" 2>&1
+
+  ########################################################
+  # 1) 전체 숨김 파일/디렉터리 목록 (정보 제공)
+  ########################################################
+  ALL_HIDDEN=$(find / \
+    -path /proc -prune -o \
+    -path /sys -prune -o \
+    -path /run -prune -o \
+    -path /dev -prune -o \
+    -name ".*" \( -type f -o -type d \) -print 2>/dev/null)
+
+  ########################################################
+  # 2) 의심 징후 숨김파일
+  # 기준: 실행 가능 / SUID / SGID / 최근 7일 변경
+  ########################################################
+  SUS_HIDDEN_FILES=$(find / \
+    -path /proc -prune -o \
+    -path /sys -prune -o \
+    -path /run -prune -o \
+    -path /dev -prune -o \
+    -name ".*" -type f \
+    \( -executable -o -perm -4000 -o -perm -2000 -o -mtime -7 \) \
+    -print 2>/dev/null)
+
+  # 개수 계산
+  if [ -n "$SUS_HIDDEN_FILES" ]; then
+    SUS_COUNT=$(echo "$SUS_HIDDEN_FILES" | wc -l)
+  else
+    SUS_COUNT=0
+  fi
+
+  ########################################################
+  # 3) 최종 판정 (요약 1줄)
+  ########################################################
+  if [ "$SUS_COUNT" -gt 0 ]; then
+    echo "※ U-33 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 의심 징후 숨김파일이 발견되었습니다. (count=$SUS_COUNT)" >> "$resultfile" 2>&1
+  else
+    echo "※ U-33 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " 의심 징후 숨김파일이 발견되지 않았습니다. (count=0)" >> "$resultfile" 2>&1
+  fi
+
+  return 0
+}
+
 U_35() {
     vuln_flag=0
     evidence_flag=0
@@ -1152,6 +1201,149 @@ U_35() {
     fi
 }
 
+U_38() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-38(상) | UNIX > 3. 서비스 관리 | DoS 공격에 취약한 서비스 비활성화 ◀"  >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : (1) 해당 서비스를 사용하지 않는 경우 N/A, (2) DoS 공격에 취약한 서비스가 비활성화된 경우" >> "$resultfile" 2>&1
+
+  local in_scope_active=0     # 점검 대상 서비스가 실제로 '활성'인지 (N/A 판단용)
+  local vulnerable=0
+  local evidences=()
+
+  # (1) inetd/xinetd 계열(전통 DoS 취약 서비스)
+  local inetd_services=("echo" "discard" "daytime" "chargen")
+
+  # (2) systemd socket 유닛(inetd 대체)
+  local systemd_sockets=("echo.socket" "discard.socket" "daytime.socket" "chargen.socket")
+
+  # (3) 확장 예시: SNMP / DNS (NTP는 보통 필요 → 기본은 info)
+  local snmp_units=("snmpd.service")
+  local dns_units=("named.service" "bind9.service")
+
+  # NTP는 정책 스위치로 제어 (기본: 취약 판정에서 제외)
+  local CHECK_NTP=0
+  local ntp_units=("chronyd.service" "ntpd.service" "systemd-timesyncd.service")
+
+  ############################
+  # A. xinetd 점검
+  ############################
+  if [ -d /etc/xinetd.d ]; then
+    for svc in "${inetd_services[@]}"; do
+      if [ -f "/etc/xinetd.d/${svc}" ]; then
+        # disable=yes면 비활성
+        local disable_yes_count
+        disable_yes_count=$(grep -vE '^\s*#' "/etc/xinetd.d/${svc}" 2>/dev/null \
+          | grep -iE '^\s*disable\s*=\s*yes\s*$' | wc -l)
+
+        if [ "$disable_yes_count" -eq 0 ]; then
+          in_scope_active=1
+          vulnerable=1
+          evidences+=("xinetd: ${svc} 서비스가 비활성화(disable=yes) 되어 있지 않습니다. (/etc/xinetd.d/${svc})")
+        else
+          evidences+=("xinetd: ${svc} 서비스가 disable=yes 로 비활성화되어 있습니다.")
+        fi
+      fi
+    done
+  fi
+
+  ############################
+  # B. inetd.conf 점검
+  ############################
+  if [ -f /etc/inetd.conf ]; then
+    for svc in "${inetd_services[@]}"; do
+      local enable_count
+      enable_count=$(grep -vE '^\s*#' /etc/inetd.conf 2>/dev/null | grep -w "$svc" | wc -l)
+      if [ "$enable_count" -gt 0 ]; then
+        in_scope_active=1
+        vulnerable=1
+        evidences+=("inetd: ${svc} 서비스가 /etc/inetd.conf 에서 활성화되어 있습니다.")
+      fi
+    done
+  fi
+
+  ############################
+  # C. systemd socket / service 점검
+  ############################
+  if command -v systemctl >/dev/null 2>&1; then
+    # 전통 inetd 대체 socket
+    for sock in "${systemd_sockets[@]}"; do
+      if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$sock"; then
+        if systemctl is-enabled --quiet "$sock" 2>/dev/null || systemctl is-active --quiet "$sock" 2>/dev/null; then
+          in_scope_active=1
+          vulnerable=1
+          evidences+=("systemd: ${sock} 가 활성화되어 있습니다. (enabled/active)")
+        else
+          evidences+=("systemd: ${sock} 가 비활성화 상태입니다.")
+        fi
+      fi
+    done
+
+    # SNMP
+    for unit in "${snmp_units[@]}"; do
+      if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$unit"; then
+        if systemctl is-enabled --quiet "$unit" 2>/dev/null || systemctl is-active --quiet "$unit" 2>/dev/null; then
+          in_scope_active=1
+          vulnerable=1
+          evidences+=("SNMP: ${unit} 가 활성화되어 있습니다.")
+        else
+          evidences+=("SNMP: ${unit} 가 비활성화 상태입니다.")
+        fi
+      fi
+    done
+
+    # DNS
+    for unit in "${dns_units[@]}"; do
+      if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$unit"; then
+        if systemctl is-enabled --quiet "$unit" 2>/dev/null || systemctl is-active --quiet "$unit" 2>/dev/null; then
+          in_scope_active=1
+          vulnerable=1
+          evidences+=("DNS: ${unit} 가 활성화되어 있습니다.")
+        else
+          evidences+=("DNS: ${unit} 가 비활성화 상태입니다.")
+        fi
+      fi
+    done
+
+    # NTP (기본은 info로만)
+    for unit in "${ntp_units[@]}"; do
+      if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$unit"; then
+        if systemctl is-enabled --quiet "$unit" 2>/dev/null || systemctl is-active --quiet "$unit" 2>/dev/null; then
+          if [ "$CHECK_NTP" -eq 1 ]; then
+            in_scope_active=1
+            vulnerable=1
+            evidences+=("NTP: ${unit} 가 활성화되어 있습니다. (정책상 점검 포함)")
+          else
+            evidences+=("info: NTP(${unit}) 활성화 감지(시간동기 서비스, 일반적으로 필요)")
+          fi
+        fi
+      fi
+    done
+  fi
+
+  ############################
+  # D. N/A 판정 (점검 대상 서비스 미사용)
+  #    - 취약 서비스 후보가 '활성'된 흔적이 하나도 없으면 N/A
+  ############################
+  if [ "$in_scope_active" -eq 0 ]; then
+    echo "※ U-38 결과 : N/A" >> "$resultfile" 2>&1
+    echo " DoS 공격에 취약한 서비스(대상)가 사용되지 않는 것으로 확인되어 점검 대상이 아닙니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  ############################
+  # 최종 판정
+  ############################
+  if [ "$vulnerable" -eq 1 ]; then
+    echo "※ U-38 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " DoS 공격에 취약한 서비스가 활성화되어 있습니다. (활성 서비스 존재)" >> "$resultfile" 2>&1
+  else
+    echo "※ U-38 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " DoS 공격에 취약한 서비스가 비활성화되어 있습니다. (활성 서비스 미확인)" >> "$resultfile" 2>&1
+  fi
+
+  return 0
+}
+
 U_40() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-40(상) | 3. 서비스 관리 > 3.7 NFS 접근 통제 ◀"  >> $resultfile 2>&1
@@ -1181,6 +1373,276 @@ U_40() {
     fi
 }
 
+U_43() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-43(상) | UNIX > 3. 서비스 관리 > NIS, NIS+ 점검 ◀"  >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : (1) NIS 서비스를 사용하지 않는 경우 N/A, (2) 사용 시 NIS 서비스 비활성화 또는 불가피 시 NIS+ 사용" >> "$resultfile" 2>&1
+
+  local mail_like_na=0   # N/A 여부 (여기서는 nis_in_use의 반대 개념)
+  local nis_in_use=0     # NIS 사용 여부
+  local vulnerable=0
+  local evidences=()
+
+  # NIS 관련 대표 프로세스
+  local nis_procs_regex='ypserv|ypbind|ypxfrd|rpc\.yppasswdd|rpc\.ypupdated|yppasswdd|ypupdated'
+  # NIS+ 관련(참고용)
+  local nisplus_procs_regex='nisplus|rpc\.nisd|nisd'
+
+  ########################################################
+  # 1) NIS 사용 여부 판단 (핵심: yp* 실행/활성 흔적)
+  ########################################################
+
+  # (1-A) systemd 유닛 (NIS 핵심만 판단에 사용)
+  if command -v systemctl >/dev/null 2>&1; then
+    local nis_units=("ypserv.service" "ypbind.service" "ypxfrd.service")
+
+    for unit in "${nis_units[@]}"; do
+      if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$unit"; then
+        if systemctl is-active --quiet "$unit" 2>/dev/null || systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+          nis_in_use=1
+          vulnerable=1
+          evidences+=("systemd: ${unit} 가 active/enabled 상태입니다.")
+        fi
+      fi
+    done
+
+    # rpcbind는 NIS 전용이 아니라 N/A 판정엔 쓰지 않고 참고로만 남김
+    if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "rpcbind.service"; then
+      if systemctl is-active --quiet "rpcbind.service" 2>/dev/null || systemctl is-enabled --quiet "rpcbind.service" 2>/dev/null; then
+        evidences+=("info: rpcbind.service 가 active/enabled 입니다. (NIS/RPC 계열 사용 가능성, 단 NIS 단독 증거는 아님)")
+      fi
+    fi
+  fi
+
+  # (1-B) 프로세스 실행 여부 (NIS 핵심)
+  if ps -ef 2>/dev/null | grep -iE "$nis_procs_regex" | grep -vE 'grep|U_43\(|U_28\(' >/dev/null 2>&1; then
+    nis_in_use=1
+    vulnerable=1
+    evidences+=("process: NIS 관련 프로세스(yp*)가 실행 중입니다.")
+  fi
+
+  # (1-C) 네트워크 리스닝(111 포트는 참고용)
+  if command -v ss >/dev/null 2>&1; then
+    if ss -lntup 2>/dev/null | grep -E ':(111)\b' >/dev/null 2>&1; then
+      evidences+=("info: TCP/UDP 111(rpcbind) 리스닝 감지(ss). (RPC 사용 흔적)")
+    fi
+  elif command -v netstat >/dev/null 2>&1; then
+    if netstat -lntup 2>/dev/null | grep -E ':(111)\b' >/dev/null 2>&1; then
+      evidences+=("info: TCP/UDP 111(rpcbind) 리스닝 감지(netstat). (RPC 사용 흔적)")
+    fi
+  fi
+
+  # (1-D) NIS+ 감지(참고)
+  if ps -ef 2>/dev/null | grep -iE "$nisplus_procs_regex" | grep -v grep >/dev/null 2>&1; then
+    evidences+=("info: NIS+ 관련 프로세스 흔적이 감지되었습니다. (환경에 따라 양호 조건 충족 가능)")
+  fi
+
+  ########################################################
+  # 2) NIS 미사용이면 N/A
+  ########################################################
+  if [ "$nis_in_use" -eq 0 ]; then
+    echo "※ U-43 결과 : N/A" >> "$resultfile" 2>&1
+    echo " NIS 서비스를 사용하지 않는 것으로 확인되어 점검 대상이 아닙니다. (yp* 서비스/프로세스 미검출)" >> "$resultfile" 2>&1
+    # 참고 정보가 있으면 같이 보여주기
+    if [ "${#evidences[@]}" -gt 0 ]; then
+      echo " --- 근거(Evidence) ---" >> "$resultfile" 2>&1
+      for e in "${evidences[@]}"; do
+        echo " - $e" >> "$resultfile" 2>&1
+      done
+    fi
+    return 0
+  fi
+
+  ########################################################
+  # 3) 사용 중이면(= NIS 활성 흔적) 취약/양호 판정
+  #    - 이미지 기준상 "NIS 서비스가 활성화된 경우 취약"
+  #    - (불가피 시 NIS+ 사용) 조건은 자동으로 확정하기 어려워서 Evidence로만 남김
+  ########################################################
+  if [ "$vulnerable" -eq 1 ]; then
+    echo "※ U-43 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " NIS 서비스가 활성화(실행/enable)된 흔적이 확인되었습니다." >> "$resultfile" 2>&1
+  else
+    # 이 케이스는 거의 없지만, nis_in_use=1인데 active/enabled가 아닌 특이 케이스 대비
+    echo "※ U-43 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " NIS 사용 흔적은 있으나 활성화(실행/enable) 상태는 확인되지 않았습니다." >> "$resultfile" 2>&1
+  fi
+
+  echo " --- 근거(Evidence) ---" >> "$resultfile" 2>&1
+  for e in "${evidences[@]}"; do
+    echo " - $e" >> "$resultfile" 2>&1
+  done
+
+  return 0
+}
+
+U_48() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-48(중) | UNIX > 3. 서비스 관리 > expn, vrfy 명령어 제한 ◀"  >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : (1) 메일 서비스를 사용하지 않는 경우 N/A, (2) 사용 시 noexpn, novrfy 옵션(또는 goaway)이 설정된 경우" >> "$resultfile" 2>&1
+
+  local mail_in_use=0
+  local vulnerable=0
+  local evidences=()
+
+  # MTA 감지 플래그 (검출된 것만 평가하기 위함)
+  local has_sendmail=0
+  local has_postfix=0
+  local has_exim=0
+
+  ########################################################
+  # 1) 메일(SMTP) 서비스 사용 여부 판단
+  #    - 25/tcp LISTEN 또는 MTA 서비스/프로세스 감지 시 "사용 중"
+  ########################################################
+  if command -v ss >/dev/null 2>&1; then
+    if ss -lnt 2>/dev/null | awk '{print $4}' | grep -Eq '(:25)$'; then
+      mail_in_use=1
+      evidences+=("network: TCP 25(smtp) LISTEN 감지(ss)")
+    fi
+  elif command -v netstat >/dev/null 2>&1; then
+    if netstat -lnt 2>/dev/null | awk '{print $4}' | grep -Eq '(:25)$'; then
+      mail_in_use=1
+      evidences+=("network: TCP 25(smtp) LISTEN 감지(netstat)")
+    fi
+  fi
+
+  if command -v systemctl >/dev/null 2>&1; then
+    for unit in sendmail.service postfix.service exim4.service; do
+      if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$unit"; then
+        if systemctl is-active --quiet "$unit" 2>/dev/null; then
+          mail_in_use=1
+          evidences+=("systemd: ${unit} active")
+          case "$unit" in
+            sendmail.service) has_sendmail=1 ;;
+            postfix.service)  has_postfix=1 ;;
+            exim4.service)    has_exim=1 ;;
+          esac
+        fi
+      fi
+    done
+  fi
+
+  # 프로세스 감지(서비스가 없어도 실행 중인 경우 대비)
+  if ps -ef 2>/dev/null | grep -iE 'sendmail' | grep -v grep >/dev/null 2>&1; then
+    mail_in_use=1
+    has_sendmail=1
+    evidences+=("process: sendmail 프로세스 감지")
+  fi
+  if ps -ef 2>/dev/null | grep -iE 'postfix|master' | grep -v grep >/dev/null 2>&1; then
+    mail_in_use=1
+    has_postfix=1
+    evidences+=("process: postfix(master 등) 프로세스 감지")
+  fi
+  if ps -ef 2>/dev/null | grep -iE 'exim' | grep -v grep >/dev/null 2>&1; then
+    mail_in_use=1
+    has_exim=1
+    evidences+=("process: exim 프로세스 감지")
+  fi
+
+  ########################################################
+  # 2) 미사용이면 N/A 처리
+  ########################################################
+  if [ "$mail_in_use" -eq 0 ]; then
+    echo "※ U-48 결과 : N/A" >> "$resultfile" 2>&1
+    echo " 메일(SMTP) 서비스를 사용하지 않는 것으로 확인되어 점검 대상이 아닙니다. (25/tcp LISTEN 및 MTA 미검출)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  ########################################################
+  # 3) 사용 중이면 설정 점검
+  ########################################################
+  local ok_cnt=0
+  local bad_cnt=0
+
+  # 3-A) Sendmail 점검: PrivacyOptions에 goaway 또는 noexpn+novrfy
+  if [ "$has_sendmail" -eq 1 ]; then
+    local sendmail_ok=0
+    local sendmail_cf_candidates=("/etc/mail/sendmail.cf" "/etc/sendmail.cf")
+    local found_cf=""
+
+    for cf in "${sendmail_cf_candidates[@]}"; do
+      if [ -f "$cf" ]; then
+        found_cf="$cf"
+        local goaway_count
+        local noexpn_novrfy_count
+
+        goaway_count=$(grep -vE '^\s*#' "$cf" 2>/dev/null | grep -iE 'PrivacyOptions' | grep -i 'goaway' | wc -l)
+        noexpn_novrfy_count=$(grep -vE '^\s*#' "$cf" 2>/dev/null | grep -iE 'PrivacyOptions' | grep -i 'noexpn' | grep -i 'novrfy' | wc -l)
+
+        if [ "$goaway_count" -gt 0 ] || [ "$noexpn_novrfy_count" -gt 0 ]; then
+          sendmail_ok=1
+          evidences+=("sendmail: ${cf} 에 PrivacyOptions(goaway 또는 noexpn+novrfy) 설정 확인")
+        else
+          evidences+=("sendmail: ${cf} 에 noexpn/novrfy(goaway 포함) 설정이 없음")
+        fi
+        break
+      fi
+    done
+
+    if [ -z "$found_cf" ]; then
+      # sendmail 사용 흔적은 있는데 설정 파일을 못 찾으면 보수적으로 취약
+      vulnerable=1
+      bad_cnt=$((bad_cnt+1))
+      evidences+=("sendmail: 실행 흔적은 있으나 sendmail.cf 파일을 찾지 못했습니다. (설정 점검 불가)")
+    else
+      if [ "$sendmail_ok" -eq 1 ]; then
+        ok_cnt=$((ok_cnt+1))
+      else
+        vulnerable=1
+        bad_cnt=$((bad_cnt+1))
+      fi
+    fi
+  fi
+
+  # 3-B) Postfix 점검: disable_vrfy_command = yes
+  #      (이미지 기준의 noexpn/novrfy와 1:1은 아니지만, VRFY 차단은 핵심 통제라서 포함)
+  if [ "$has_postfix" -eq 1 ]; then
+    if [ -f /etc/postfix/main.cf ]; then
+      local postfix_vrfy
+      postfix_vrfy=$(grep -vE '^\s*#' /etc/postfix/main.cf 2>/dev/null \
+        | grep -iE '^\s*disable_vrfy_command\s*=\s*yes\s*$' | wc -l)
+
+      if [ "$postfix_vrfy" -gt 0 ]; then
+        ok_cnt=$((ok_cnt+1))
+        evidences+=("postfix: /etc/postfix/main.cf 에 disable_vrfy_command=yes 설정 확인")
+      else
+        vulnerable=1
+        bad_cnt=$((bad_cnt+1))
+        evidences+=("postfix: postfix 사용 중이나 disable_vrfy_command=yes 설정이 없음")
+      fi
+    else
+      vulnerable=1
+      bad_cnt=$((bad_cnt+1))
+      evidences+=("postfix: postfix 사용 흔적은 있으나 /etc/postfix/main.cf 파일이 없습니다. (설정 점검 불가)")
+    fi
+  fi
+
+  # 3-C) Exim (자동 판별 난이도 높음 → 기본은 Evidence만)
+  if [ "$has_exim" -eq 1 ]; then
+    evidences+=("exim: exim 사용 흔적 감지(구성 파일 기반 vrfy/expn 제한 수동 확인 필요)")
+    # 정책을 더 보수적으로 하고 싶으면 아래를 활성화:
+    # vulnerable=1
+    # bad_cnt=$((bad_cnt+1))
+  fi
+
+  ########################################################
+  # 4) 최종 출력(네가 원하는 스타일)
+  ########################################################
+  if [ "$vulnerable" -eq 1 ]; then
+    echo "※ U-48 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 메일(SMTP) 서비스 사용 중이며 expn/vrfy 제한 설정이 미흡합니다. (미설정/점검불가=$bad_cnt, 설정확인=$ok_cnt)" >> "$resultfile" 2>&1
+  else
+    echo "※ U-48 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " 메일(SMTP) 서비스 사용 중이며 expn/vrfy 제한 설정이 확인되었습니다. (설정확인=$ok_cnt)" >> "$resultfile" 2>&1
+  fi
+
+  echo " --- 근거(Evidence) ---" >> "$resultfile" 2>&1
+  for e in "${evidences[@]}"; do
+    echo " - $e" >> "$resultfile" 2>&1
+  done
+
+  return 0
+}
+
 U_01
 U_03
 U_05
@@ -1197,5 +1659,9 @@ U_23
 U_25
 U_28
 U_30
+U_33
 U_35
+U_38
 U_40
+U_43
+U_48
