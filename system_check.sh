@@ -2,6 +2,7 @@
 
 resultfile="Results_$(date '+%F_%H:%M:%S').txt"
 
+#희윤
 U_01() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-01(상) | 1. 계정관리 > 1.1 root 계정 원격접속 제한 ◀" >> $resultfile 2>&1
@@ -14,26 +15,52 @@ U_01() {
 
     # 1. 취약 원격 터미널 서비스 점검
     for svc in "${BAD_SERVICES[@]}"; do
-        if systemctl list-unit-files | grep -q "^$svc"; then
-            if systemctl is-active "$svc" &>/dev/null; then
+        if systemctl is-active "$svc" &>/dev/null; then
+            if [[ "$svc" == *"telnet"* ]]; then
+                break 
+            else
                 VULN=1
-                REASON="$svc 서비스 실행 중 입니다."
+                REASON="$svc 서비스가 실행 중입니다."
                 break
             fi
         fi
     done
 
-    # 2. SSH 점검 
-    if [ $VULN -eq 0 ] && systemctl is-active sshd &>/dev/null; then
-        ROOT_LOGIN=$(sshd -T 2>/dev/null | grep -i '^permitrootlogin' | awk '{print $2}')
-
-        if [[ "$ROOT_LOGIN" != "no" ]]; then
-            VULN=1
-            REASON="SSH 서비스를 사용하고, root 계정의 원격 접속이 허용중입니다."
+    # 2. Telnet 서비스가 ps나 netstat으로 확인될 경우
+    if [ $VULN -eq 0 ]; then
+        if ps -ef | grep -i 'telnet' | grep -v 'grep' &>/dev/null || \
+           netstat -nat 2>/dev/null | grep -w 'tcp' | grep -i 'LISTEN' | grep ':23 ' &>/dev/null; then  
+            # PAM 설정 확인
+            if [ -f /etc/pam.d/login ]; then
+                if ! grep -vE '^#|^\s#' /etc/pam.d/login | grep -qi 'pam_securetty.so'; then
+                    VULN=1
+                    REASON="Telnet 서비스 사용 중이며, /etc/pam.d/login에 pam_securetty.so 설정이 없습니다."
+                fi
+            fi
+            # securetty 설정 확인
+            if [ $VULN -eq 0 ]; then
+                if [ -f /etc/securetty ]; then
+                    if grep -vE '^#|^\s#' /etc/securetty | grep -q '^ *pts'; then
+                        VULN=1
+                        REASON="Telnet 서비스 사용 중이며, /etc/securetty에 pts 터미널이 허용되어 있습니다."
+                    fi
+                fi
+            fi
         fi
     fi
 
-    # 3. 결과 출력 
+    # 3. SSH 점검 
+    if [ $VULN -eq 0 ] && (systemctl is-active sshd &>/dev/null || ps -ef | grep -v grep | grep -q sshd); then
+        # sshd -T로 현재 적용된 PermitRootLogin 설정을 확인
+        ROOT_LOGIN=$(sshd -T 2>/dev/null | grep -i '^permitrootlogin' | awk '{print $2}')
+        
+        if [[ "$ROOT_LOGIN" != "no" ]]; then
+            VULN=1
+            REASON="SSH root 접속이 허용 중입니다 (PermitRootLogin: $ROOT_LOGIN)."
+        fi
+    fi
+
+    # 4. 결과 출력 
     if [ $VULN -eq 1 ]; then
         echo "※ U-01 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
         echo " $REASON" >> $resultfile 2>&1
@@ -41,6 +68,7 @@ U_01() {
         echo "※ U-01 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
+
 
 U_03() {
   echo ""  >> "$resultfile" 2>&1
@@ -143,6 +171,7 @@ U_05() {
     fi
 }
 
+#희윤
 U_06(){
     echo "" >> $resultfile 2>&1
     echo "▶ U-06(상) | 1. 계정관리 > 1.6 사용자 계정 su 기능 제한 ◀" >> $resultfile 2>&1
@@ -280,6 +309,7 @@ U_10() {
     echo "※ U-10 결과 : 양호(Good)" >> $resultfile 2>&1
 }
 
+#희윤
 U_11(){
     echo "" >> $resultfile 2>&1
     echo "▶ U-11(하) | 1. 계정관리 > 1.11 사용자 shell 점검 ◀" >> $resultfile 2>&1
@@ -419,6 +449,7 @@ U_15() {
     fi
 }
 
+#희윤
 U_16(){
     echo "" >> $resultfile 2>&1
     echo "▶ U-16(상) | 2. 파일 및 디렉토리 관리 > 2.3 /etc/passwd 파일 소유자 및 권한 설정 ◀" >> $resultfile 2>&1
@@ -604,6 +635,56 @@ U_20() {
     fi
 }
 
+#희윤
+U_21(){
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-21(상) | 2. 파일 및 디렉토리 관리 > 2.8 /etc/(r)syslog.conf 파일 소유자 및 권한 설정 ◀"  >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 :  /etc/(r)syslog.conf 파일의 소유자가 root(또는 bin, sys)이고, 권한이 640 이하인 경우" >> "$resultfile" 2>&1
+
+  local target
+  # 1. rsyslog.conf 또는 syslog.conf파일 존재하는지 확인
+  if [ -f "/etc/rsyslog.conf" ]; then
+    target="/etc/rsyslog.conf"
+  elif [ -f "/etc/syslog.conf" ]; then
+    target="/etc/syslog.conf"
+  else 
+    echo "※ U-21 결과 : N/A" >> "$resultfile" 2>&1
+    echo " /etc/rsyslog.conf 또는 /etc/syslog.conf 파일이 존재하지 않습니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2. 1에서 파일의 소유자 및 권한 확인
+  local OWNER PERMIT
+  OWNER="$(sudo stat -c '%U' "$target" 2>/dev/null)"
+  PERMIT="$(sudo stat -c'%a' "$target" 2>/dev/null)"
+  # 정보 못읽어 올때 처리 어떻게 할지 
+  # [정보 못 읽어올 때 처리] - 변수가 비어있는지 체크
+  if [ -z "$OWNER" ] || [ -z "$PERMIT" ]; then
+    echo "※ U-21 결과 : N/A" >> "$resultfile" 2>&1
+    echo " stat 명령으로 $target 정보를 읽지 못했습니다. (권한 문제 등)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  if [[ ! "$OWNER" =~ ^(root|bin|sys)$ ]]; then
+    echo "※ U-21 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " $target 파일의 소유자가 root, bin, sys가 아닙니다. (owner=$OWNER)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  
+  # 3. 파일의 권한이 640이하 인지 체크 
+  if [ "$PERMIT" -gt 640 ]; then
+    echo "※ U-21 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " $target 파일의 권한이 640보다 큽니다. (permit=$PERMIT)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 4. 결과 출력
+  echo "※ U-21 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " $target 파일의 소유자($OWNER) 및 권한($PERMIT)이 기준에 적합합니다." >> "$resultfile" 2>&1
+
+}
+
 U_23() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-23(상) | UNIX > 2. 파일 및 디렉토리 관리| SUID, SGID, Sticky bit 설정 파일 점검 ◀"  >> "$resultfile" 2>&1
@@ -701,6 +782,42 @@ U_25() {
     else
         echo "※ U-25 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
+}
+
+#희윤
+U_26(){
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-26(상) | 2. 파일 및 디렉토리 관리 > /dev에 존재하지 않는 device 파일 점검 ◀"  >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : /dev 디렉터리에 대한 파일 점검 후 존재하지 않는 device 파일을 제거한 경우" >> "$resultfile" 2>&1
+
+  local target_dir="/dev"
+  local VULN=0
+  local REASON=""
+
+  # 1. /dev 디렉터리 존재 여부 체크
+  if [ ! -d "$target_dir" ]; then
+    echo  
+    echo "※ U-26 결과 : N/A" >> "$resultfile" 2>&1
+    echo " $target_dir 디렉터리가 존재하지 않습니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2. /dev 디렉터리가 있다면 존재하지 않는 디바이스인지 확인하기 위해 파일 type이 일반 파일 인것만 찾기
+  # /dev/mqueue나 /dev/shm 파일은 제외함 
+  VUL_FILES=$(find /dev \( -path /dev/mqueue -o -path /dev/shm \) -prune -o -type f -print 2>/dev/null)
+
+  if [ -n "$VUL_FILES" ]; then
+    VULN=1
+    REASON="/dev 내부에 존재하지 않아야 할 일반 파일이 발견되었습니다. $(echo $VUL_FILES | tr '\n' ' ')"
+  fi
+
+  # 3. 결과 출력 
+  if [ "$VULN" -eq 1 ]; then
+        echo "※ U-26 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " [Reason] $REASON" >> "$resultfile" 2>&1
+    else
+        echo "※ U-26 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
 }
 
 U_28() {
@@ -959,6 +1076,54 @@ U_30() {
     echo "※ U-30 결과 : 양호(Good)" >> $resultfile 2>&1
 }
 
+#희윤
+U_31() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-31(중) | 2. 파일 및 디렉토리 관리 > 2.18 홈 디렉토리 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 홈 디렉토리 소유자가 해당 계정이고, 타 사용자 쓰기 권한이 제거된 경우" >> "$resultfile" 2>&1
+
+  VULN=0
+  REASON=""
+
+  # 1. /etc/passwd에서 일반 사용자 계정 추출 (UID 1000이상, 시스템 계정 제외하고)
+  USER_LIST=$(awk -F: '$3 >= 1000 && $3 < 60000 && $7 !~ /nologin|false/ { print $1 ":" $6 }' /etc/passwd)
+
+  for USER in $USER_LIST; do
+    USERNAME=$(echo "$USER" | cut -d: -f1)
+    HOMEDIR=$(echo "$USER" | cut -d: -f2)
+
+    # 2. 홈 디렉토리 실제로 존재하는지 확인
+    if [ -d "$HOMEDIR" ]; then
+      OWNER=$(stat -c '%U' "$HOMEDIR")
+      PERMIT=$(stat -c '%a' "$HOMEDIR")
+      OTHERS_PERMIT=$(echo "$PERMIT" | sed 's/.*\(.\)$/\1/')
+
+      # 3. 홈 디렉토리 소유자가 계정명과 일치하는지 여부 판단
+      if [ "$OWNER" != "$USERNAME" ]; then
+        VULN=1
+        REASON="$REASON 소유자가 불일치 합니다. $USERNAME 계정의 홈($HOMEDIR), 현재 소유자 : $OWNER 입니다. |"
+      fi
+
+      # 4. 타 사용자 쓰기 권한이 포함되어 있는지 여부 판단
+      if [[ "$OTHERS_PERMIT" =~ [2367] ]]; then
+        VULN=1
+        REASON="$REASON 타 사용자 쓰기권한이 $USERNAME 계정의 홈 $HOMEDIR 에 존재합니다. (현재 권한: $PERMIT) |"
+      fi
+    else
+      VULN=1
+      REASON="$REASON $USERNAME 계정의 홈 디렉토리가 존재하지 않습니다. "
+    fi
+  done
+
+  # 5. 결과 출력
+  if [ "$VULN" -eq 1 ]; then
+    echo "※ U-31 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo "$REASON" >> "$resultfile" 2>&1
+  else
+    echo "※ U-31 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
+}
+
 U_33() {
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-33(하) | UNIX > 2. 파일 및 디렉토리 관리 > 숨겨진 파일 및 디렉토리 검색 및 제거 ◀" >> "$resultfile" 2>&1
@@ -1201,6 +1366,52 @@ U_35() {
     fi
 }
 
+#희윤
+U_36(){
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-36(상) | 3. 서비스 관리 > 3.3 r 계열 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 불필요한 r 계열 서비스가 비활성화된 경우 " >> "$resultfile" 2>&1
+
+  VULN=0
+  REASON=""
+
+  # 1. rexec, rlogin, rsh포트가 Listen 중인지 확인
+  CHECK_PORT=$(ss -antl | grep -E ':512|:513|:514')
+  
+  if [ -n "$CHECK_PORT" ]; then
+    VULN=1
+    REASON="$REASON r-command 관련 포트(512, 513, 514)가 활성화되어 있습니다. |"
+  fi
+
+  # 2. systemctl을 사용하는 서비스 점검
+  SERVICES=("rlogin" "rsh" "rexec" "shell" "login" "exec")
+  
+  for SVC in "${SERVICES[@]}"; do
+    # 3. 서비스가 존재하는지 확인하고, 실행 여부 체크
+    if systemctl is-active --quiet "$SVC" 2>/dev/null; then
+      VULN=1
+      REASON="$REASON 활성화된 r 계열 서비스를 발견하였습니다. $SVC 서비스가 구동 중입니다. |"
+    fi
+  done
+
+  # 4. xinetd 설정 파일 점검
+  if [ -d "/etc/xinetd.d" ]; then
+    XINTETD_VUL=$(grep -lE "disable\s*=\s*no" /etc/xinetd.d/rlogin /etc/xinetd.d/rsh /etc/xinetd.d/rexec /etc/xinetd.d/shell /etc/xinetd.d/login /etc/xinetd.d/exec 2>/dev/null)
+    if [ -n "$XINTETD_VUL" ]; then
+      VULN=1
+      REASON=" $REASON xinetd 설정이 취약합니다. 다음 파일에서 서비스가 활성화 되었습니다. $(echo $XINETD_VUL | tr '\n' ' ') |"
+    fi
+  fi
+
+  # 5. 결과 출력
+  if [ "$VULN" -eq 1 ]; then
+    echo "※ U-36 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " $REASON" >> "$resultfile" 2>&1
+  else
+    echo "※ U-36 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
+}
+
 U_38() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-38(상) | UNIX > 3. 서비스 관리 | DoS 공격에 취약한 서비스 비활성화 ◀"  >> "$resultfile" 2>&1
@@ -1373,6 +1584,38 @@ U_40() {
     fi
 }
 
+#희윤
+U_41(){
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-41(상) | 3. 서비스 관리 > 3.8 불필요한 automountd 제거 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : automountd 서비스가 비활성화된 경우 " >> "$resultfile" 2>&1
+
+  VULN=0
+  REASON=""
+
+  # 1. systemctl로 automountd 서비스 활성화 여부 확인
+  if systemctl is-active --quiet autofs 2>/dev/null; then
+    VULN=1
+    REASON="$REASON automountd 서비스가 활성화되어 있습니다. |"
+  fi
+
+  # 2. 1번에서 확인되지 않았지만 프로세스가 실행되고 있는지 여부 확인
+  if ps -ef | grep -v grep | grep -Ei "automount|autofs"; then
+    if [ "$VULN" -eq 0 ]; then 
+      VULN=1
+      REASON="$REASON automountd 서비스가 활성화되어 실행중입니다. |"
+    fi
+  fi 
+
+  # 3. 결과 출력
+  if [ "$VULN" -eq 1 ]; then
+    echo "※ U-41 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " $REASON" >> "$resultfile" 2>&1
+  else
+    echo "※ U-41 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
+}
+
 U_45() {
     # 2026/02/06 기준 sendmail 최신 버전 : 8.18.2 를 기준으로 점검
     echo ""  >> $resultfile 2>&1
@@ -1510,6 +1753,41 @@ U_43() {
   done
 
   return 0
+}
+
+#희윤
+U_46(){
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-46(상) | 3. 서비스 관리 > 3.13 일반 사용자의 메일 서비스 실행 방지 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 일반 사용자의 메일 서비스 실행 방지가 설정된 경우 " >> "$resultfile" 2>&1
+
+  VULN=0 
+  REASON=""
+
+  # 1. Sendmail 서비스가 실행되고 있는지 확인
+  if ps -ef | grep -v grep | grep -q "sendmail"; then
+
+    # 2. Sendmail 설정 파일(/etc/mail/sendmail.cf) 점검
+    if [ -f "/etc/mail/sendmail.cf" ]; then
+      CHECK=$(grep -i "PrivacyOptions" /etc/mail/sendmail.cf | grep "restrictqrun")
+
+      if [-z "$CHECK" ]; then
+        VULN=1
+        REASON="$REASON Sendmail 서비스가 실행 중이며, 일반 사용자의 메일 서비스 실행 방지가 설정되어 있지 않습니다. |"
+      fi
+    else
+      VULN=1
+      REASON="$REASON Sendmail 서비스가 실행 중이나 설정파일이 존재하지 않습니다. |"
+    fi
+  fi
+  
+  # 3. 결과 출력
+  if [ "$VULN" -eq 1 ]; then
+    echo "※ U-46 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " $REASON" >> "$resultfile" 2>&1
+  else
+    echo "※ U-46 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
 }
 
 U_48() {
@@ -1697,6 +1975,59 @@ U_50() {
     echo "※ U-50 결과 : 양호(Good)" >> $resultfile 2>&1
 }
 
+#희윤
+U_51(){
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-51(중) | 3. 서비스 관리 > 3.18 DNS 서비스의 취약한 동적 업데이트 설정 금지 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : DNS 서비스의 동적 업데이트 기능이 비활성화되었거나, 활성화 시 적절한 접근통제를 수행하고 있는 경우 " >> "$resultfile" 2>&1
+
+  VULN=0
+  REASON=""
+
+  # 1. DNS 서비스 실행 여부 확인
+  if ps -ef | grep -v grep | grep -q "named"; then
+    CONF="/etc/named.conf"
+    CONF_FILES=("$CONF")
+
+    # 2. 점검 파일 대상 추출
+    if [ -f "$CONF" ]; then
+        EXTRACTED_PATHS=$(grep -E "^\s*(include|file)" "$CONF" | awk -F'"' '{print $2}')
+
+        for IN_FILE in $EXTRACTED_PATHS; do
+            if [ -f "$IN_FILE" ]; then
+                CONF_FILES+=("$IN_FILE")
+            elif [ -f "/etc/$IN_FILE" ]; then
+                CONF_FILES+=("/etc/$IN_FILE")
+            elif [ -f "/var/named/$IN_FILE" ]; then
+                CONF_FILES+=("/var/named/$IN_FILE")
+            fi
+        done
+    fi
+
+    # 3. 2에서 확보된 모든 설정 파일 점검 
+    for FILE in "${CONF_FILES[@]}"; do
+      if [ -f "$FILE" ]; then
+        CHECK=$(grep -vE "^\s*//|^\s*#|^\s*/\*" "$FILE" | grep -i "allow-update" | grep -Ei "any|\{\s*any\s*;\s*\}")
+        if [ -n "$CHECK" ]; then
+          VULN=1
+          REASON="$REASON $FILE 파일에서 동적 업데이트가 전체로 허용되어 있습니다. |"
+        fi
+      fi
+    done
+
+  else
+   :
+  fi
+
+  # 4. 결과 출력
+  if [ "$VULN" -eq 1 ]; then
+    echo "※ U-51 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " $REASON" >> "$resultfile" 2>&1
+  else
+    echo "※ U-51 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
+}
+
 U_55() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-55(중) | 3. 서비스 관리 > 3.22 FTP 계정 Shell 제한 ◀" >> $resultfile 2>&1
@@ -1730,6 +2061,74 @@ U_55() {
         echo "※ U-55 결과 : 양호(Good)" >> $resultfile 2>&1
         echo " ftp 계정에 /bin/false 또는 nologin 쉘이 부여되어 있습니다." >> $resultfile 2>&1
     fi
+}
+
+#희윤
+U_56(){
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-56(하) | 3. 서비스 관리 > 3.23 FTP 서비스 접근 제어 설정 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 특정 IP주소 또는 호스트에서만 FTP 서버에 접속할 수 있도록 접근 제어 설정을 적용한 경우 " >> "$resultfile" 2>&1
+
+  VULN=0
+  REASON=""
+  
+  # 1. FTP 프로세스 확인
+  if ps -ef | grep -v grep | grep -q "vsftpd"; then
+    CONF="/etc/vsftpd/vsftpd.conf"
+    if [ ! -f "$CONF" ]; then CONF="/etc/vsftpd.conf"; fi
+
+    if [ -f "$CONF" ]; then
+      USERLIST_ENABLE=$(grep -vE "^\s*#" "$CONF" | grep -i "userlist_enable" | awk -F= '{print $2}' | tr -d ' ')
+
+      if [ "$USERLIST_ENABLE" = "YES" ]; then
+        if [ ! -f "/etc/vsftpd/user_list" ] && [ ! -f "/etc/vsftpd.user_list" ]; then
+          VULN=1
+          REASON="$REASON vsftpd(userlist_enable=YES)를 사용 중이나, 접근 제어 파일이 없습니다. |"
+        fi
+      else
+        if [ ! -f "/etc/vsftpd/ftpusers" ] && [ ! -f "/etc/vsftpd.ftpusers" ]; then
+          VULN=1
+          REASON="$REASON vsftpd(userlist_enable=NO)를 사용 중이나, 접근 제어 파일이 없습니다. |"
+        fi
+      fi
+    else
+      VULN=1
+      REASON="$REASON vsftpd 서비스가 실행중이나 설정파일을 찾을 수 없습니다. |"
+    fi
+  
+  # 2. FTP 서비스(proftpd) 프로세스 및 설정 점검 
+  elif ps -ef | grep -v grep | grep -q "proftpd"; then
+    CONF="/etc/proftpd.conf"
+    if [ ! -f "$CONF" ]; then CONF="/etc/proftpd/proftpd.conf"; fi
+
+    if [ -f "$CONF" ]; then
+      U_F_U=$(grep -vE "^\s*#" "$CONF" | grep -i "UseFtpUsers" | awk '{print $2}')
+
+      if [ -z "$U_F_U" ] || [ "$U_F_U" = "on" ]; then
+        if [ ! -f "/etc/ftpusers" ] && [ ! -f "/etc/ftpd/ftpusers" ]; then
+          VULN=1
+          REASON="$REASON proftpd(UseFtpUsers=on)를 사용 중이나, 접근 제어 파일이 없습니다. |"
+        fi
+      else
+        LIMIT=$(grep -i "<Limit LOGIN>" "$CONF")
+        if [ -z "$LIMIT" ]; then
+          VULN=1
+          REASON="$REASON proftpd(UseFtpUsers=off)를 사용 중이나, 설정 파일 내 접근 제어 설정이 없습니다. |"
+        fi
+      fi
+    fi
+  
+  else
+    :
+  fi
+
+  # 3. 결과 출력
+  if [ "$VULN" -eq 1 ]; then
+    echo "※ U-56 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " $REASON" >> "$resultfile" 2>&1
+  else
+    echo "※ U-56 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
 }
 
 U_60() {
@@ -1819,6 +2218,62 @@ U_60() {
         echo "※ U-60 결과 : 양호(Good)" >> $resultfile 2>&1
         echo " SNMP Community String이 복잡성 기준을 만족합니다." >> $resultfile 2>&1
     fi
+}
+
+#희윤
+U_61(){
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-61(상) | 3. 서비스 관리 > 3.28 SNMP Access Control 설정 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 :  SNMP 서비스에 접근 제어 설정이 되어 있는 경우 " >> "$resultfile" 2>&1
+  
+  VULN=0
+  REASON=""
+
+  # 1. SNMP 서비스 프로세스 실행 여부 확인
+  if ps -ef | grep -v grep | grep -q "snmpd" ; then 
+    
+    CONF="/etc/snmp/snmpd.conf"
+
+    if [ -f "$CONF" ]; then
+      # 2. com2sec 설정 점검 
+      CHECK_COM2SEC=$(grep -vE "^\s*#" "$CONF" | grep -E "^\s*com2sec" | awk '$3=="default" {print $0}')
+      # 3. rocommunity/rwcommunity 설정 점검
+      CHECK_COMM=$(grep -vE "^\s*#" "$CONF" | grep -Ei "^\s*(ro|rw)community6?|^\s*(ro|rw)user")
+
+      IS_COMM_VULN=0
+      if [ -n "$CHECK_COMM" ]; then
+        while read -r line; do  
+          COMM_STR=$(echo "$line" | awk '{print $2}')
+          SOURCE_IP=$(echo "$line" | awk '{print $3}')
+
+          if [[ "$SOURCE_IP" == "default" ]] || [[ "$COMM_STR" =~ public|private ]]; then
+              IS_COMM_VULN=1
+              break
+          fi
+        done <<< "$CHECK_COMM"
+      fi
+
+      # 4. 취약 여부 종합 판단
+      if [ -n "$CHECK_COM2SEC" ] || [ "$IS_COMM_VULN" -eq 1 ]; then
+        VULN=1
+        REASON="$REASON SNMP 설정 파일($CONF)에 모든 호스트 접근을 허용하는 설정이 존재합니다. |"
+      fi
+    else
+      VULN=1
+      REASON="$REASON SNMP 서비스가 실행 중이고, 설정 파일을 찾을 수 없습니다. |"
+    fi
+  
+  else
+    :
+  fi
+
+  # 5. 결과 출력
+  if [ "$VULN" -eq 1 ]; then
+    echo "※ U-61 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " $REASON" >> "$resultfile" 2>&1
+  else
+    echo "※ U-61 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
 }
 
 U_65() {
@@ -1944,11 +2399,69 @@ U_65() {
     fi
 }
 
+#희윤
+U_66(){
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-66(중) | 5. 로그 관리 > 5.2 정책에 따른 시스템 로깅 설정 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 로그 기록 정책이 보안 정책에 따라 설정되어 수립되어 있으며, 로그를 남기고 있는 경우 " >> "$resultfile" 2>&1
+
+  VULN=0
+  REASON=""
+  CONF="/etc/rsyslog.conf"
+  CONF_FILES=("$CONF")
+  [ -d "/etc/rsyslog.d" ] && CONF_FILES+=($(ls /etc/rsyslog.d/*.conf 2>/dev/null))
+
+  # 1. rsyslog 프로세스 확인
+  if ps -ef | grep -v grep | grep -q "rsyslogd"; then
+
+      if [ -f "$CONF" ]; then
+          ALL_CONF_CONTENT=$(cat "${CONF_FILES[@]}" 2>/dev/null | grep -vE "^\s*#")
+
+          # 2. 주요 로그 설정 항목 점검 (정규식 보완: 공백 및 '-' 대응)
+          CHECK_MSG=$(echo "$ALL_CONF_CONTENT" | grep -E "\*\.info[[:space:]]+-?\/var\/log\/messages")
+          CHECK_SECURE=$(echo "$ALL_CONF_CONTENT" | grep -E "auth(priv)?\.\*[[:space:]]+-?\/var\/log\/secure")
+          CHECK_MAIL=$(echo "$ALL_CONF_CONTENT" | grep -E "mail\.\*[[:space:]]+-?\/var\/log\/maillog")
+          CHECK_CRON=$(echo "$ALL_CONF_CONTENT" | grep -E "cron\.\*[[:space:]]+-?\/var\/log\/cron")
+          CHECK_ALERT=$(echo "$ALL_CONF_CONTENT" | grep -E "\*\.alert[[:space:]]+(\/dev\/console|:omusrmsg:\*|root)")
+          CHECK_EMERG=$(echo "$ALL_CONF_CONTENT" | grep -E "\*\.emerg[[:space:]]+(\*|:omusrmsg:\*)")
+
+          # 3. 누락 항목 확인
+          MISSING_LOGS=""
+          [ -z "$CHECK_MSG" ] && MISSING_LOGS="$MISSING_LOGS [messages]"
+          [ -z "$CHECK_SECURE" ] && MISSING_LOGS="$MISSING_LOGS [secure]"
+          [ -z "$CHECK_MAIL" ] && MISSING_LOGS="$MISSING_LOGS [maillog]"
+          [ -z "$CHECK_CRON" ] && MISSING_LOGS="$MISSING_LOGS [cron]"
+          [ -z "$CHECK_ALERT" ] && MISSING_LOGS="$MISSING_LOGS [console/alert]"
+          [ -z "$CHECK_EMERG" ] && MISSING_LOGS="$MISSING_LOGS [emerg]"
+
+          if [ -n "$MISSING_LOGS" ]; then
+              VULN=1
+              REASON="rsyslog 설정에 다음 주요 로그 항목이 누락되었습니다: $MISSING_LOGS |"
+          fi
+
+      else
+          VULN=1
+          REASON="rsyslog 데몬은 실행 중이나 설정 파일($CONF)을 찾을 수 없습니다. |"
+      fi
+  else
+      VULN=1
+      REASON="시스템 로그 데몬(rsyslogd)이 실행 중이지 않습니다. |"
+  fi
+
+  # 4. 결과 출력
+  if [ "$VULN" -eq 1 ]; then
+      echo "※ U-66 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+      echo " $REASON" >> "$resultfile" 2>&1
+  else
+      echo "※ U-66 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi 
+}    
+
 U_01
 U_03
 U_05
 U_06
-U-08
+U_08
 U_10
 U_11
 U_13
@@ -1956,18 +2469,28 @@ U_15
 U_16
 U_18
 U_20
+U_21
 U_23
 U_25
+U_26
 U_28
 U_30
+U_31
 U_33
 U_35
+U_36
 U_38
 U_40
+U_41
 U_43
 U_45
+U_46
 U_48
 U_50
+U_51
 U_55
+U_56
 U_60
+U_61
 U_65
+U_66
