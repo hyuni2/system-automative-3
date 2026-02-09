@@ -1,14 +1,42 @@
 # system-automative-3
-시스템 보안 자동화 프로젝트 - 현대오토에버 모빌리티 sw 3조
+시스템 보안 자동화 프로젝트 - 현대오토에버 모빌리티 SW 3조
 
-#파일구조
-.
-├── OS_Scripts              # [OS별 점검 스크립트 저장 폴더]
-│   ├── Debian-family
-│   │   └── Ubuntu24.sh     # Ubuntu 24.04 점검 스크립트
-│   └── RHEL-family
-│       ├── Rocky10.sh      # Rocky Linux 10 점검 스크립트
-│       └── Rocky9.sh       # Rocky Linux 9 점검 스크립트
-├── README.md
-├── Report                  # [결과물] 점검 리포트가 저장될 폴더
-└── main.sh                 # [중앙 제어] 사용자 입력 및 OS별 스크립트 호출
+## 📁 파일 구조
+
+```
+system-automative-3/
+│
+├── 📄 main.sh                          # [진입점] 사용자 메뉴 & OS별 스크립트 호출
+├── 📄 test.sh                          # [핵심] KISA 보안 점검 통합 스크립트
+├── 📄 README.md                        # 프로젝트 설명서
+│
+├── 📁 OS_Scripts/                      # [OS별 점검 스크립트]
+│   ├── 📁 RHEL-family/
+│   │   ├── 📄 Rocky9.sh               # Rocky Linux 9 점검
+│   │   └── 📄 Rocky10.sh              # Rocky Linux 10 점검
+│   │
+│   └── 📁 Debian-family/
+│       └── 📄 Ubuntu24.sh             # Ubuntu 24.04 점검
+│
+└── 📁 Report/                          # [결과물] 점검 리포트 저장 폴더
+    └── KISA_RESULT_*.txt              # 자동 생성되는 점검 결과 파일
+```
+
+## 🔄 실행 흐름
+
+```
+main.sh (사용자 메뉴 선택)
+    ↓
+test.sh (자동 OS 감지 & KISA 점검 실행)
+    ↓
+Report/KISA_RESULT_*.txt (결과 저장)
+```
+
+## 📋 주요 파일 설명
+
+| 파일 | 역할 |
+|------|------|
+| **main.sh** | 사용자가 OS를 선택하는 메뉴 인터페이스 |
+| **test.sh** | KISA 14개 항목 자동 점검 (U-01~U-27) |
+| **Rocky9.sh, Rocky10.sh** | RHEL 계열 스크립트 (test.sh 참조) |
+| **Ubuntu24.sh** | Debian 계열 스크립트 (test.sh 참조) |
