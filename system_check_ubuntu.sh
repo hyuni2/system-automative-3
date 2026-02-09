@@ -616,68 +616,103 @@ U_28() {
   echo " 기본 차단 정책(ALL:ALL)이 적용되어 있으며 전체 허용 설정이 없습니다." >> "$resultfile" 2>&1
   return 0
 }
+
 #수진
+# U_30() {
+#     echo "" >> "$resultfile" 2>&1
+#     echo "▶ U-30(중) | 2. 파일 및 디렉토리 관리 > 2.17 UMASK 설정 관리 ◀" >> "$resultfile" 2>&1
+#     echo " 양호 판단 기준 : UMASK 값이 022 이상으로 설정된 경우" >> "$resultfile" 2>&1
+#     vuln_flag=0
+#     print_vuln_once() {
+#         if [ "$vuln_flag" -eq 0 ]; then
+#             echo "※ U-30 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+#             vuln_flag=1
+#         fi
+#     }
+#     # 현재 세션 umask 설정 점검
+#     cur_umask="$(umask)"
+#     group_umask=$(printf "%s" "$cur_umask" | sed 's/^.*\(..\)$/\1/' | cut -c1)
+#     other_umask=$(printf "%s" "$cur_umask" | sed 's/^.*\(..\)$/\1/' | cut -c2)
+#     if [ "$group_umask" -lt 2 ] 2>/dev/null; then
+#         print_vuln_once
+#         echo " 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다. (umask=$cur_umask)" >> "$resultfile" 2>&1
+#     fi
+#     if [ "$other_umask" -lt 2 ] 2>/dev/null; then
+#         print_vuln_once
+#         echo " 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다. (umask=$cur_umask)" >> "$resultfile" 2>&1
+#     fi
+#     # /etc/profile 파일 내 umask 설정 점검
+#     check_umask_file() {
+#         file="$1"
+#         [ -f "$file" ] || return 0
+#         grep -i 'umask' "$file" 2>/dev/null \
+#         | grep -vE '^[[:space:]]*#|=' \
+#         | while read _ val; do
+#             val="$(printf "%s" "$val" | tr -d '[:space:]')"
+#             case "$val" in
+#                 [0-9][0-9][0-9]|[0-9][0-9])
+#                     g=$(printf "%s" "$val" | sed 's/^.*\(..\)$/\1/' | cut -c1)
+#                     o=$(printf "%s" "$val" | sed 's/^.*\(..\)$/\1/' | cut -c2)
+#                     if [ "$g" -lt 2 ] || [ "$o" -lt 2 ]; then
+#                         print_vuln_once
+#                         echo " $file 파일에 umask 값이 022 이상으로 설정되지 않았습니다. (umask $val)" >> "$resultfile" 2>&1
+#                     fi
+#                     ;;
+#                 *)
+#                     print_vuln_once
+#                     echo " $file 파일에 설정된 umask 값이 보안 설정에 부합하지 않습니다. (umask $val)" >> "$resultfile" 2>&1
+#                     ;;
+#             esac
+#         done
+#     }
+#     check_umask_file "/etc/profile"
+#     check_umask_file "/etc/bash.bashrc"
+#     check_umask_file "/etc/login.defs"
+#     # 사용자 홈 디렉터리 설정 파일에서 umask 설정 확인
+#     awk -F: '$7 !~ /(nologin|false)/ {print $6}' /etc/passwd | sort -u |
+#     while IFS= read -r home; do
+#         for f in ".profile" ".bashrc" ".bash_profile" ".cshrc" ".login"; do
+#             check_umask_file "$home/$f"
+#         done
+#     done
+#     if [ "$vuln_flag" -eq 0 ]; then
+#         echo "※ U-30 결과 : 양호(Good)" >> "$resultfile" 2>&1
+#     fi
+# }
 U_30() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-30(중) | 2. 파일 및 디렉토리 관리 > 2.17 UMASK 설정 관리 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : UMASK 값이 022 이상으로 설정된 경우" >> "$resultfile" 2>&1
     vuln_flag=0
-    print_vuln_once() {
-        if [ "$vuln_flag" -eq 0 ]; then
-            echo "※ U-30 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    # systemd UMask 점검
+    for svc in $(systemctl list-unit-files --type=service --no-legend | awk '{print $1}'); do
+        umask_val=$(systemctl show "$svc" -p UMask 2>/dev/null | awk -F= '{print $2}')
+        [ -z "$umask_val" ] && continue
+
+        umask_dec=$((8#$umask_val))
+        if [ "$umask_dec" -lt 18 ]; then
+            vuln_flag=1
+            break
+        fi
+    done
+    # login.defs, PAM 점검
+    if [ "$vuln_flag" -eq 0 ]; then
+        if grep -q "pam_umask.so" /etc/pam.d/common-session 2>/dev/null; then
+            login_umask=$(grep -E "^UMASK" /etc/login.defs 2>/dev/null | awk '{print $2}')
+            if [ -z "$login_umask" ] || [ $((8#$login_umask)) -lt 18 ]; then
+                vuln_flag=1
+            fi
+        else
             vuln_flag=1
         fi
-    }
-    # 현재 세션 umask 설정 점검
-    cur_umask="$(umask)"
-    group_umask=$(printf "%s" "$cur_umask" | sed 's/^.*\(..\)$/\1/' | cut -c1)
-    other_umask=$(printf "%s" "$cur_umask" | sed 's/^.*\(..\)$/\1/' | cut -c2)
-    if [ "$group_umask" -lt 2 ] 2>/dev/null; then
-        print_vuln_once
-        echo " 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다. (umask=$cur_umask)" >> "$resultfile" 2>&1
     fi
-    if [ "$other_umask" -lt 2 ] 2>/dev/null; then
-        print_vuln_once
-        echo " 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다. (umask=$cur_umask)" >> "$resultfile" 2>&1
-    fi
-    # /etc/profile 파일 내 umask 설정 점검
-    check_umask_file() {
-        file="$1"
-        [ -f "$file" ] || return 0
-        grep -i 'umask' "$file" 2>/dev/null \
-        | grep -vE '^[[:space:]]*#|=' \
-        | while read _ val; do
-            val="$(printf "%s" "$val" | tr -d '[:space:]')"
-            case "$val" in
-                [0-9][0-9][0-9]|[0-9][0-9])
-                    g=$(printf "%s" "$val" | sed 's/^.*\(..\)$/\1/' | cut -c1)
-                    o=$(printf "%s" "$val" | sed 's/^.*\(..\)$/\1/' | cut -c2)
-                    if [ "$g" -lt 2 ] || [ "$o" -lt 2 ]; then
-                        print_vuln_once
-                        echo " $file 파일에 umask 값이 022 이상으로 설정되지 않았습니다. (umask $val)" >> "$resultfile" 2>&1
-                    fi
-                    ;;
-                *)
-                    print_vuln_once
-                    echo " $file 파일에 설정된 umask 값이 보안 설정에 부합하지 않습니다. (umask $val)" >> "$resultfile" 2>&1
-                    ;;
-            esac
-        done
-    }
-    check_umask_file "/etc/profile"
-    check_umask_file "/etc/bash.bashrc"
-    check_umask_file "/etc/login.defs"
-    # 사용자 홈 디렉터리 설정 파일에서 umask 설정 확인
-    awk -F: '$7 !~ /(nologin|false)/ {print $6}' /etc/passwd | sort -u |
-    while IFS= read -r home; do
-        for f in ".profile" ".bashrc" ".bash_profile" ".cshrc" ".login"; do
-            check_umask_file "$home/$f"
-        done
-    done
-    if [ "$vuln_flag" -eq 0 ]; then
+    if [ "$vuln_flag" -eq 1 ]; then
+        echo "※ U-30 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    else
         echo "※ U-30 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
 }
+
 #연수
 U_33() {
   echo "" >> "$resultfile" 2>&1
