@@ -69,7 +69,7 @@ U_01() {
     fi
 }
 
-
+#연수
 U_03() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-03(상) | UNIX > 1. 계정 관리| 계정 잠금 임계값 설정 ◀"  >> "$resultfile" 2>&1
@@ -156,7 +156,7 @@ U_03() {
   echo " 계정 잠금 임계값(deny)이 10회 이하로 확인되었습니다. (max deny=$max_deny)" >> "$resultfile" 2>&1
   return 0
 }
-
+#수진
 U_05() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-05(상) | 1. 계정관리 > 1.5 root 이외의 UID가 '0' 금지 ◀"  >> $resultfile 2>&1
@@ -214,7 +214,7 @@ U_06(){
         echo "※ U-06 결과 : 양호(Good)" >> $resultfile 2>&1
     fi 
 }
-
+#연수
 U_08() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-08(중) | UNIX > 1. 계정 관리| 관리자 그룹에 최소한의 계정 포함 ◀"  >> "$resultfile" 2>&1
@@ -295,7 +295,7 @@ U_08() {
   echo " 관리자 그룹에서 불필요 계정이 확인되지 않았습니다." >> "$resultfile" 2>&1
   return 0
 }
-
+#수진
 U_10() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀"  >> $resultfile 2>&1
@@ -308,7 +308,6 @@ U_10() {
     fi
     echo "※ U-10 결과 : 양호(Good)" >> $resultfile 2>&1
 }
-
 #희윤
 U_11(){
     echo "" >> $resultfile 2>&1
@@ -356,7 +355,7 @@ U_11(){
         echo "※ U-11 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
-
+#연수
 U_13() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-13(중) | 1. 계정관리 > 안전한 비밀번호 암호화 알고리즘 사용 ◀"  >> "$resultfile" 2>&1
@@ -436,7 +435,7 @@ U_13() {
   echo " SHA-2 기반 해시 알고리즘($5/$6)만 사용 중입니다. (점검계정 수: $checked)" >> "$resultfile" 2>&1
   return 0
 }
-
+#수진
 U_15() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-15(상) | 2. 파일 및 디렉토리 관리 > 2.2 파일 및 디렉터리 소유자 설정 ◀"  >> $resultfile 2>&1
@@ -448,7 +447,6 @@ U_15() {
         echo "※ U-15 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
-
 #희윤
 U_16(){
     echo "" >> $resultfile 2>&1
@@ -493,7 +491,7 @@ U_16(){
     fi
 
 }
-
+#연수
 U_18() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-18(상) | UNIX > 2. 파일 및 디렉토리 관리| /etc/shadow 파일 소유자 및 권한 설정 ◀"  >> "$resultfile" 2>&1
@@ -568,7 +566,7 @@ U_18() {
   echo " $target 소유자(root) 및 권한(perm=$perm)이 기준(400)을 만족합니다." >> "$resultfile" 2>&1
   return 0
 }
-
+#수진
 U_20() {
     # ------------------------------------------------------------------------
     # 원래 inetd.conf 파일은 데몬들의 서비스 매핑 테이블을 담고 있던 파일임 
@@ -634,7 +632,6 @@ U_20() {
         echo "※ U-20 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
-
 #희윤
 U_21(){
   echo ""  >> "$resultfile" 2>&1
@@ -684,7 +681,7 @@ U_21(){
   echo " $target 파일의 소유자($OWNER) 및 권한($PERMIT)이 기준에 적합합니다." >> "$resultfile" 2>&1
 
 }
-
+#연수
 U_23() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-23(상) | UNIX > 2. 파일 및 디렉토리 관리| SUID, SGID, Sticky bit 설정 파일 점검 ◀"  >> "$resultfile" 2>&1
@@ -771,7 +768,7 @@ U_23() {
   echo " 점검 대상 주요 실행 파일에서 SUID/SGID 설정이 확인되지 않았습니다." >> "$resultfile" 2>&1
   return 0
 }
-
+#수진
 U_25() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-25(상) | 2. 파일 및 디렉토리 관리 > 2.12 world writable 파일 점검 ◀"  >> $resultfile 2>&1
@@ -783,7 +780,6 @@ U_25() {
         echo "※ U-25 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
-
 #희윤
 U_26(){
   echo ""  >> "$resultfile" 2>&1
@@ -819,7 +815,7 @@ U_26(){
         echo "※ U-26 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
-
+#연수
 U_28() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-28(상) | 2. 파일 및 디렉토리 관리 > 접속 IP 및 포트 제한 ◀"  >> "$resultfile" 2>&1
@@ -904,7 +900,7 @@ U_28() {
   echo " 기본 차단 정책(ALL:ALL)이 적용되어 있으며 전체 허용 설정이 없습니다." >> "$resultfile" 2>&1
   return 0
 }
-
+#수진
 U_30() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-30(중) | 2. 파일 및 디렉토리 관리 > 2.17 UMASK 설정 관리 ◀"  >> $resultfile 2>&1
@@ -1075,7 +1071,6 @@ U_30() {
     done
     echo "※ U-30 결과 : 양호(Good)" >> $resultfile 2>&1
 }
-
 #희윤
 U_31() {
   echo "" >> "$resultfile" 2>&1
@@ -1123,7 +1118,7 @@ U_31() {
     echo "※ U-31 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
-
+#연수
 U_33() {
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-33(하) | UNIX > 2. 파일 및 디렉토리 관리 > 숨겨진 파일 및 디렉토리 검색 및 제거 ◀" >> "$resultfile" 2>&1
@@ -1172,7 +1167,7 @@ U_33() {
 
   return 0
 }
-
+#수진
 U_35() {
     vuln_flag=0
     evidence_flag=0
@@ -1365,7 +1360,6 @@ U_35() {
         echo "※ U-35 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
 }
-
 #희윤
 U_36(){
   echo "" >> "$resultfile" 2>&1
@@ -1411,7 +1405,7 @@ U_36(){
     echo "※ U-36 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
-
+#연수
 U_38() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-38(상) | UNIX > 3. 서비스 관리 | DoS 공격에 취약한 서비스 비활성화 ◀"  >> "$resultfile" 2>&1
@@ -1554,7 +1548,7 @@ U_38() {
 
   return 0
 }
-
+#수진
 U_40() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-40(상) | 3. 서비스 관리 > 3.7 NFS 접근 통제 ◀"  >> $resultfile 2>&1
@@ -1583,7 +1577,6 @@ U_40() {
         echo "※ U-40 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
-
 #희윤
 U_41(){
   echo "" >> "$resultfile" 2>&1
@@ -1615,44 +1608,7 @@ U_41(){
     echo "※ U-41 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
-
-U_45() {
-    # 2026/02/06 기준 sendmail 최신 버전 : 8.18.2 를 기준으로 점검
-    echo ""  >> $resultfile 2>&1
-    echo "▶ U-45(상) | 3. 서비스 관리 > 3.12 메일 서비스 버전 점검 ◀"  >> $resultfile 2>&1
-    echo " 양호 판단 기준 : 메일 서비스 버전이 최신버전인 경우" >> $resultfile 2>&1
-    if [ -f /etc/services ]; then
-        smtp_port_count=`grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}' | wc -l`
-        if [ $smtp_port_count -gt 0 ]; then
-            smtp_port=(`grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}'`)
-            for ((i=0; i<${#smtp_port[@]}; i++))
-            do
-                netstat_smtp_count=`netstat -nat 2>/dev/null | grep -w 'tcp' | grep -Ei 'listen|established|syn_sent|syn_received' | grep ":${smtp_port[$i]} " | wc -l`
-                if [ $netstat_smtp_count -gt 0 ]; then
-                    rpm_smtp_version=`rpm -qa 2>/dev/null | grep 'sendmail' | awk -F 'sendmail-' '{print $2}'`
-                    dnf_smtp_version=`dnf list installed sendmail 2>/dev/null | grep -v 'Installed Packages' | awk '{print $2}'`
-                    if [[ $rpm_smtp_version != 8.18.2* ]] && [[ $dnf_smtp_version != 8.18.2* ]]; then
-                        echo "※ U-45 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                        echo " 메일 서비스 버전이 최신 버전(8.18.2)이 아닙니다." >> $resultfile 2>&1
-                        return 0
-                    fi
-                fi
-            done
-        fi
-    fi
-    ps_smtp_count=`ps -ef | grep -iE 'smtp|sendmail' | grep -v 'grep' | wc -l`
-    if [ $ps_smtp_count -gt 0 ]; then
-        rpm_smtp_version=`rpm -qa 2>/dev/null | grep 'sendmail' | awk -F 'sendmail-' '{print $2}'`
-        dnf_smtp_version=`dnf list installed sendmail 2>/dev/null | grep -v 'Installed Packages' | awk '{print $2}'`
-        if [[ $rpm_smtp_version != 8.18.2* ]] && [[ $dnf_smtp_version != 8.18.2* ]]; then
-            echo "※ U-45 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-            echo " 메일 서비스 버전이 최신 버전(8.18.2)이 아닙니다." >> $resultfile 2>&1
-            return 0
-        fi
-    fi
-    echo "※ U-45 결과 : 양호(Good)" >> $resultfile 2>&1
-}
-
+#연수
 U_43() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-43(상) | UNIX > 3. 서비스 관리 > NIS, NIS+ 점검 ◀"  >> "$resultfile" 2>&1
@@ -1754,7 +1710,43 @@ U_43() {
 
   return 0
 }
-
+#수진
+U_45() {
+    # 2026/02/06 기준 sendmail 최신 버전 : 8.18.2 를 기준으로 점검
+    echo ""  >> $resultfile 2>&1
+    echo "▶ U-45(상) | 3. 서비스 관리 > 3.12 메일 서비스 버전 점검 ◀"  >> $resultfile 2>&1
+    echo " 양호 판단 기준 : 메일 서비스 버전이 최신버전인 경우" >> $resultfile 2>&1
+    if [ -f /etc/services ]; then
+        smtp_port_count=`grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}' | wc -l`
+        if [ $smtp_port_count -gt 0 ]; then
+            smtp_port=(`grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}'`)
+            for ((i=0; i<${#smtp_port[@]}; i++))
+            do
+                netstat_smtp_count=`netstat -nat 2>/dev/null | grep -w 'tcp' | grep -Ei 'listen|established|syn_sent|syn_received' | grep ":${smtp_port[$i]} " | wc -l`
+                if [ $netstat_smtp_count -gt 0 ]; then
+                    rpm_smtp_version=`rpm -qa 2>/dev/null | grep 'sendmail' | awk -F 'sendmail-' '{print $2}'`
+                    dnf_smtp_version=`dnf list installed sendmail 2>/dev/null | grep -v 'Installed Packages' | awk '{print $2}'`
+                    if [[ $rpm_smtp_version != 8.18.2* ]] && [[ $dnf_smtp_version != 8.18.2* ]]; then
+                        echo "※ U-45 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+                        echo " 메일 서비스 버전이 최신 버전(8.18.2)이 아닙니다." >> $resultfile 2>&1
+                        return 0
+                    fi
+                fi
+            done
+        fi
+    fi
+    ps_smtp_count=`ps -ef | grep -iE 'smtp|sendmail' | grep -v 'grep' | wc -l`
+    if [ $ps_smtp_count -gt 0 ]; then
+        rpm_smtp_version=`rpm -qa 2>/dev/null | grep 'sendmail' | awk -F 'sendmail-' '{print $2}'`
+        dnf_smtp_version=`dnf list installed sendmail 2>/dev/null | grep -v 'Installed Packages' | awk '{print $2}'`
+        if [[ $rpm_smtp_version != 8.18.2* ]] && [[ $dnf_smtp_version != 8.18.2* ]]; then
+            echo "※ U-45 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+            echo " 메일 서비스 버전이 최신 버전(8.18.2)이 아닙니다." >> $resultfile 2>&1
+            return 0
+        fi
+    fi
+    echo "※ U-45 결과 : 양호(Good)" >> $resultfile 2>&1
+}
 #희윤
 U_46(){
   echo "" >> "$resultfile" 2>&1
@@ -1789,7 +1781,7 @@ U_46(){
     echo "※ U-46 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
-
+#연수
 U_48() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-48(중) | UNIX > 3. 서비스 관리 > expn, vrfy 명령어 제한 ◀"  >> "$resultfile" 2>&1
@@ -1957,7 +1949,7 @@ U_48() {
 
   return 0
 }
-
+#수진
 U_50() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-50(상) | 3. 서비스 관리 > 3.17 DNS Zone Transfer 설정 ◀"  >> $resultfile 2>&1
@@ -1974,7 +1966,6 @@ U_50() {
     fi
     echo "※ U-50 결과 : 양호(Good)" >> $resultfile 2>&1
 }
-
 #희윤
 U_51(){
   echo "" >> "$resultfile" 2>&1
@@ -2027,7 +2018,107 @@ U_51(){
     echo "※ U-51 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+#연수
+U_53() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-53(하) | UNIX > 3. 서비스 관리 > FTP 서비스 정보 노출 제한 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : FTP 접속 배너에 노출되는 정보가 없는 경우" >> "$resultfile" 2>&1
 
+  # 0) FTP(21/tcp) 리스닝 여부 확인
+  local listen_info=""
+  if command -v ss >/dev/null 2>&1; then
+    listen_info=$(ss -ltnp 2>/dev/null | awk '$4 ~ /:21$/ {print}' | head -n 1)
+  else
+    listen_info=$(netstat -ltnp 2>/dev/null | awk '$4 ~ /:21$/ {print}' | head -n 1)
+  fi
+
+  if [ -z "$listen_info" ]; then
+    echo "※ U-53 결과 : N/A" >> "$resultfile" 2>&1
+    echo " FTP 서비스(21/tcp)가 리스닝 상태가 아니므로 점검 대상이 아닙니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 1) 데몬 식별 (vsftpd / proftpd)
+  local daemon=""
+  if echo "$listen_info" | grep -qi "vsftpd"; then
+    daemon="vsftpd"
+  elif echo "$listen_info" | grep -Eqi "proftpd|proftp"; then
+    daemon="proftpd"
+  else
+    # systemd로 보조 판별
+    if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet vsftpd 2>/dev/null; then
+      daemon="vsftpd"
+    elif command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet proftpd 2>/dev/null; then
+      daemon="proftpd"
+    fi
+  fi
+
+  # 2) 설정 파일에서 배너 설정 확인 (가이드 반영)
+  local config_leak=0
+
+  if [ "$daemon" = "vsftpd" ]; then
+    # Rocky에서 흔한 경로 2개
+    local f=""
+    for f in /etc/vsftpd/vsftpd.conf /etc/vsftpd.conf; do
+      if [ -f "$f" ]; then
+        # ftpd_banner가 설정되어 있고, 그 값에 제품명/버전/숫자버전 패턴이 있으면 노출로 판단
+        local vline
+        vline=$(grep -E '^[[:space:]]*ftpd_banner[[:space:]]*=' "$f" 2>/dev/null | tail -n 1)
+        if [ -n "$vline" ]; then
+          echo "$vline" | grep -Eqi '(vsftpd|ftp server|version|[0-9]+\.[0-9]+(\.[0-9]+)?)' && config_leak=1
+        fi
+      fi
+    done
+
+  elif [ "$daemon" = "proftpd" ]; then
+    local f=""
+    for f in /etc/proftpd/proftpd.conf /etc/proftpd.conf; do
+      if [ -f "$f" ]; then
+        local pline
+        pline=$(grep -E '^[[:space:]]*ServerIdent[[:space:]]+' "$f" 2>/dev/null | tail -n 1)
+        if [ -n "$pline" ]; then
+          # ServerIdent on 이거나, 버전/숫자버전 패턴이 있으면 노출 가능
+          echo "$pline" | grep -Eqi '(ServerIdent[[:space:]]+on|version|[0-9]+\.[0-9]+(\.[0-9]+)?)' && config_leak=1
+        fi
+      fi
+    done
+  fi
+
+  # 3) 실제 FTP 배너(접속 첫 줄) 확인
+  local banner=""
+  if command -v timeout >/dev/null 2>&1; then
+    if command -v nc >/dev/null 2>&1; then
+      banner=$((echo -e "QUIT\r\n"; sleep 0.2) | timeout 3 nc -n 127.0.0.1 21 2>/dev/null | head -n 1 | tr -d '\r')
+    else
+      banner=$(timeout 3 bash -c '
+        exec 3<>/dev/tcp/127.0.0.1/21 || exit 1
+        IFS= read -r line <&3 || true
+        echo "$line"
+        echo -e "QUIT\r\n" >&3
+        exec 3<&-; exec 3>&-
+      ' 2>/dev/null | head -n 1 | tr -d '\r')
+    fi
+  fi
+
+  local banner_leak=0
+  if [ -n "$banner" ]; then
+    echo "$banner" | grep -Eqi \
+      '(vsftpd|proftpd|pure-?ftpd|wu-?ftpd|ftp server|version|[0-9]+\.[0-9]+(\.[0-9]+)?)' \
+      && banner_leak=1
+  fi
+
+  # 4) 최종 판정
+  if [ "$config_leak" -eq 1 ] || [ "$banner_leak" -eq 1 ]; then
+    echo "※ U-53 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " FTP 접속 배너에 서비스명/버전 등 불필요한 정보 노출 가능성이 있습니다." >> "$resultfile" 2>&1
+  else
+    echo "※ U-53 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " FTP 접속 배너에 노출되는 정보가 없습니다." >> "$resultfile" 2>&1
+  fi
+
+  return 0
+}
+#수진
 U_55() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-55(중) | 3. 서비스 관리 > 3.22 FTP 계정 Shell 제한 ◀" >> $resultfile 2>&1
@@ -2062,7 +2153,6 @@ U_55() {
         echo " ftp 계정에 /bin/false 또는 nologin 쉘이 부여되어 있습니다." >> $resultfile 2>&1
     fi
 }
-
 #희윤
 U_56(){
   echo "" >> "$resultfile" 2>&1
@@ -2130,7 +2220,65 @@ U_56(){
     echo "※ U-56 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+#연수
+U_58() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-58(중) | UNIX > 3. 서비스 관리 > 불필요한 SNMP 서비스 구동 점검 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : SNMP 서비스를 사용하지 않는 경우" >> "$resultfile" 2>&1
 
+  local found=0
+  local reason=""
+
+  # 1) systemd 서비스 상태 확인 (snmpd / snmptrapd)
+  if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet snmpd 2>/dev/null; then
+      found=1
+      reason="snmpd 서비스가 활성(Active) 상태입니다."
+    elif systemctl is-active --quiet snmptrapd 2>/dev/null; then
+      found=1
+      reason="snmptrapd 서비스가 활성(Active) 상태입니다."
+    fi
+  fi
+
+  # 2) 프로세스 확인 (보조 검증)
+  if [ "$found" -eq 0 ] && command -v pgrep >/dev/null 2>&1; then
+    if pgrep -x snmpd >/dev/null 2>&1; then
+      found=1
+      reason="snmpd 프로세스가 실행 중입니다."
+    elif pgrep -x snmptrapd >/dev/null 2>&1; then
+      found=1
+      reason="snmptrapd 프로세스가 실행 중입니다."
+    fi
+  fi
+
+  # 3) 포트 리스닝 확인 (UDP 161/162)
+  if [ "$found" -eq 0 ]; then
+    if command -v ss >/dev/null 2>&1; then
+      if ss -lunp 2>/dev/null | awk '$5 ~ /:(161|162)$/ {print}' | head -n 1 | grep -q .; then
+        found=1
+        reason="SNMP 포트(161/162 UDP)가 리스닝 상태입니다."
+      fi
+    elif command -v netstat >/dev/null 2>&1; then
+      if netstat -lunp 2>/dev/null | awk '$4 ~ /:(161|162)$/ {print}' | head -n 1 | grep -q .; then
+        found=1
+        reason="SNMP 포트(161/162 UDP)가 리스닝 상태입니다."
+      fi
+    fi
+  fi
+
+  # 최종 판정
+  if [ "$found" -eq 1 ]; then
+    echo "※ U-58 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " SNMP 서비스를 사용하고 있습니다." >> "$resultfile" 2>&1
+    echo " $reason" >> "$resultfile" 2>&1
+  else
+    echo "※ U-58 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " SNMP 서비스가 비활성화되어 있습니다." >> "$resultfile" 2>&1
+  fi
+
+  return 0
+}
+#수진
 U_60() {
     echo ""  >> $resultfile 2>&1
     echo " ▶ U-60(중) | 3. 서비스 관리 > 3.27 SNMP Community String 복잡성 설정 ◀"  >> $resultfile 2>&1
@@ -2219,7 +2367,6 @@ U_60() {
         echo " SNMP Community String이 복잡성 기준을 만족합니다." >> $resultfile 2>&1
     fi
 }
-
 #희윤
 U_61(){
   echo "" >> "$resultfile" 2>&1
@@ -2275,7 +2422,47 @@ U_61(){
     echo "※ U-61 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+#연수
+U_63() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-63(중) | UNIX > 3. 서비스 관리 > sudo 명령어 접근 관리 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : /etc/sudoers 파일 소유자가 root이고, 파일 권한이 640인 경우" >> "$resultfile" 2>&1
 
+  # 1) /etc/sudoers 존재 여부
+  if [ ! -e /etc/sudoers ]; then
+    echo "※ U-63 결과 : N/A" >> "$resultfile" 2>&1
+    echo " /etc/sudoers 파일이 존재하지 않아 점검 대상이 아닙니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2) 소유자/권한 확인
+  local owner perm
+  owner=$(stat -c %U /etc/sudoers 2>/dev/null)
+  perm=$(stat -c %a /etc/sudoers 2>/dev/null)
+
+  # stat 실패 대비 (일부 Unix 호환)
+  if [ -z "$owner" ] || [ -z "$perm" ]; then
+    owner=$(ls -l /etc/sudoers 2>/dev/null | awk '{print $3}')
+    perm=$(ls -l /etc/sudoers 2>/dev/null | awk '{print $1}')
+    # perm이 "rwxr-x---" 형태라면 숫자로 바꾸기 어려워서 취약/양호 판정 불가 → 점검불가 처리
+    echo "※ U-63 결과 : 점검불가" >> "$resultfile" 2>&1
+    echo " /etc/sudoers 권한 정보를 숫자(예: 640)로 확인할 수 없습니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 3) 판정 기준: owner=root AND perm==640
+  if [ "$owner" = "root" ] && [ "$perm" = "640" ]; then
+    echo "※ U-63 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " /etc/sudoers 소유자: $owner, 권한: $perm" >> "$resultfile" 2>&1
+  else
+    echo "※ U-63 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " /etc/sudoers 소유자 또는 권한 설정이 기준에 부합하지 않습니다." >> "$resultfile" 2>&1
+    echo " 현재 소유자: $owner, 권한: $perm" >> "$resultfile" 2>&1
+  fi
+
+  return 0
+}
+#수진
 U_65() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-65(중) | 5. 로그 관리 > 5.1 NTP 및 시각 동기화 설정 ◀"  >> $resultfile 2>&1
@@ -2398,7 +2585,6 @@ U_65() {
         fi
     fi
 }
-
 #희윤
 U_66(){
   echo "" >> "$resultfile" 2>&1
@@ -2488,9 +2674,12 @@ U_46
 U_48
 U_50
 U_51
+U_53
 U_55
 U_56
+U_58
 U_60
 U_61
+U_63
 U_65
 U_66
