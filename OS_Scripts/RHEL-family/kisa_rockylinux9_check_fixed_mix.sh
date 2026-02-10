@@ -1870,6 +1870,69 @@ U_38() {
 
   return 0
 }
+#연수
+U_39() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-39(상) | UNIX > 3. 서비스 관리 > 불필요한 NFS 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 불필요한 NFS 서비스 관련 데몬이 비활성화 되어 있는 경우" >> "$resultfile" 2>&1
+
+  local found=0
+  local reason=""
+
+  # 1) systemd 기반 서비스 활성 여부 확인
+  if command -v systemctl >/dev/null 2>&1; then
+    local nfs_units=(
+      "nfs-server"
+      "nfs"
+      "nfs-mountd"
+      "rpcbind"
+      "rpc-statd"
+      "rpc-statd-notify"
+      "rpc-gssd"
+      "rpc-svcgssd"
+      "rpc-idmapd"
+      "nfs-idmapd"
+    )
+
+    for u in "${nfs_units[@]}"; do
+      # 등록된 유닛만 대상으로 체크
+      if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "${u}.service"; then
+        if systemctl is-active --quiet "${u}.service" 2>/dev/null; then
+          found=1
+          reason+="${u}.service active; "
+        fi
+      fi
+    done
+
+    # nfs 관련 서비스 전체에서 active 항목이 있는지 보조 체크
+    if systemctl list-units --type=service 2>/dev/null | grep -Eiq 'nfs|rpcbind|statd|mountd|idmapd|gssd'; then
+      # 위에서 이미 잡았을 수 있으니, 근거가 비어있을 때만 보강
+      if [ -z "$reason" ]; then
+        found=1
+        reason="systemctl 목록에서 nfs/rpc 관련 서비스가 동작 중으로 보입니다."
+      fi
+    fi
+  fi
+
+  # 2) 프로세스 기반 보조 확인 (기존 U-24 스타일 유지)
+  if ps -ef 2>/dev/null | grep -iE 'nfs|rpc\.statd|statd|rpc\.lockd|lockd|rpcbind|mountd|idmapd|gssd' \
+    | grep -ivE 'grep|kblockd|rstatd' >/dev/null 2>&1; then
+    found=1
+    if [ -z "$reason" ]; then
+      reason="NFS 관련 데몬 프로세스가 실행 중입니다. (ps -ef 기준)"
+    fi
+  fi
+
+  if [ "$found" -eq 1 ]; then
+    echo "※ U-39 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 불필요한 NFS 서비스 관련 데몬이 실행 중입니다. ($reason)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  echo "※ U-39 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " NFS 서비스 관련 데몬이 비활성/미사용 상태입니다." >> "$resultfile" 2>&1
+  return 0
+}
 #수진
 U_40() {
     echo ""  >> $resultfile 2>&1
@@ -2030,6 +2093,62 @@ U_43() {
     echo " - $e" >> "$resultfile" 2>&1
   done
 
+  return 0
+}
+#연수
+U_44() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-44(상) | UNIX > 3. 서비스 관리 > tftp, talk 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : tftp, talk, ntalk 서비스가 비활성화 되어 있는 경우" >> "$resultfile" 2>&1
+
+  local services=("tftp" "talk" "ntalk")
+
+  # 1) systemd 서비스 체크 (활성/동작 중이면 취약)
+  if command -v systemctl >/dev/null 2>&1; then
+    for s in "${services[@]}"; do
+      # 흔한 유닛 이름들까지 같이 체크 (tftp/tftp-server, talk/talk-server 등 환경차 대응)
+      local units=("$s" "$s.service" "${s}d" "${s}d.service" "${s}-server" "${s}-server.service" "tftp-server.service" "tftpd.service" "talkd.service")
+      for u in "${units[@]}"; do
+        if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$u"; then
+          if systemctl is-active --quiet "$u" 2>/dev/null; then
+            echo "※ U-44 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+            echo " $s 서비스가 systemd에서 활성 상태입니다. (unit=$u)" >> "$resultfile" 2>&1
+            return 0
+          fi
+        fi
+      done
+    done
+  fi
+
+  # 2) xinetd 설정 체크 (disable=yes가 아니면 취약)
+  if [ -d /etc/xinetd.d ]; then
+    for s in "${services[@]}"; do
+      if [ -f "/etc/xinetd.d/$s" ]; then
+        # 주석/공백 제외 후 disable 설정 확인
+        local disable_line
+        disable_line="$(grep -vE '^[[:space:]]*#|^[[:space:]]*$' "/etc/xinetd.d/$s" 2>/dev/null | grep -Ei '^[[:space:]]*disable[[:space:]]*=' | tail -n 1)"
+        if ! echo "$disable_line" | grep -Eiq 'disable[[:space:]]*=[[:space:]]*yes'; then
+          echo "※ U-44 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+          echo " $s 서비스가 /etc/xinetd.d/$s 에서 비활성화(disable=yes)되어 있지 않습니다." >> "$resultfile" 2>&1
+          return 0
+        fi
+      fi
+    done
+  fi
+
+  # 3) inetd.conf 체크 (주석 아닌 라인에 서비스가 있으면 취약)
+  if [ -f /etc/inetd.conf ]; then
+    for s in "${services[@]}"; do
+      if grep -vE '^[[:space:]]*#|^[[:space:]]*$' /etc/inetd.conf 2>/dev/null | grep -Eiq "(^|[[:space:]])$s([[:space:]]|$)"; then
+        echo "※ U-44 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " $s 서비스가 /etc/inetd.conf 파일에서 활성 상태(주석 아님)로 존재합니다." >> "$resultfile" 2>&1
+        return 0
+      fi
+    done
+  fi
+
+  echo "※ U-44 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " tftp/talk/ntalk 서비스가 systemd/xinetd/inetd 설정에서 모두 비활성 상태입니다." >> "$resultfile" 2>&1
   return 0
 }
 #수진
@@ -2271,6 +2390,87 @@ U_48() {
 
   return 0
 }
+#연수
+U_49() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-49(상) | UNIX > 3. 서비스 관리 > DNS 보안 버전 패치 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : DNS 서비스를 사용하지 않거나 주기적으로 패치를 관리하고 있는 경우" >> "$resultfile" 2>&1
+
+  local named_active=0
+  local named_running=0
+  local bind_ver=""
+  local major="" minor="" patch=""
+  local evidence=""
+
+  # 1) DNS 서비스 사용 여부 (named)
+  if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet named 2>/dev/null; then
+      named_active=1
+    fi
+  fi
+  if ps -ef 2>/dev/null | grep -i 'named' | grep -v grep >/dev/null 2>&1; then
+    named_running=1
+  fi
+
+  # 서비스 미사용이면 양호
+  if [ "$named_active" -eq 0 ] && [ "$named_running" -eq 0 ]; then
+    echo "※ U-49 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " DNS 서비스(named)가 비활성/미사용 상태입니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2) BIND 버전 확인 (named -v 우선)
+  if command -v named >/dev/null 2>&1; then
+    bind_ver="$(named -v 2>/dev/null | grep -Eo '([0-9]+\.){2}[0-9]+' | head -n 1)"
+  fi
+
+  # named -v로 못 얻으면 패키지에서 추출
+  if [ -z "$bind_ver" ]; then
+    if command -v rpm >/dev/null 2>&1; then
+      bind_ver="$(rpm -q bind 2>/dev/null | grep -Eo '([0-9]+\.){2}[0-9]+' | head -n 1)"
+    fi
+  fi
+
+  if [ -z "$bind_ver" ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " named는 동작 중이나 BIND 버전을 확인하지 못했습니다. (named -v / rpm -q bind 실패)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  major="$(echo "$bind_ver" | awk -F. '{print $1}')"
+  minor="$(echo "$bind_ver" | awk -F. '{print $2}')"
+  patch="$(echo "$bind_ver" | awk -F. '{print $3}')"
+
+  # 3) 판정 (9.18.7 이상이면 양호 / 9.19+는 개발/테스트로 간주 -> 취약 처리)
+  if [ "$major" -ne 9 ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " BIND 메이저 버전이 9가 아닙니다. (현재: $bind_ver)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  if [ "$minor" -ge 19 ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " BIND $bind_ver 는 9.19+ (개발/테스트 버전으로 간주) 입니다. 운영 권고 버전(9.18.7 이상)으로 관리 필요." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  if [ "$minor" -lt 18 ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " BIND 버전이 9.18 미만입니다. (현재: $bind_ver, 기준: 9.18.7 이상)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # minor == 18 인 경우 patch 비교
+  if [ "$patch" -lt 7 ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " BIND 버전이 최신 버전(9.18.7 이상)이 아닙니다. (현재: $bind_ver)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  echo "※ U-49 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " DNS 서비스 사용 중이며 BIND 버전이 기준 이상입니다. (현재: $bind_ver)" >> "$resultfile" 2>&1
+  return 0
+}
 #수진
 U_50() {
     echo ""  >> $resultfile 2>&1
@@ -2440,6 +2640,68 @@ U_53() {
 
   return 0
 }
+#연수
+U_54() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-54(중) | UNIX > 3. 서비스 관리 > 암호화되지 않는 FTP 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 암호화되지 않은 FTP 서비스가 비활성화된 경우" >> "$resultfile" 2>&1
+
+  local ftp_active=0
+  local reason=""
+
+  # ==============================
+  # 1) vsftpd 확인
+  # ==============================
+  if systemctl list-unit-files 2>/dev/null | grep -q "^vsftpd.service"; then
+    if systemctl is-active --quiet vsftpd 2>/dev/null; then
+      ftp_active=1
+      reason+="vsftpd 서비스가 활성 상태; "
+    fi
+  fi
+
+  # ==============================
+  # 2) proftpd 확인
+  # ==============================
+  if systemctl list-unit-files 2>/dev/null | grep -q "^proftpd.service"; then
+    if systemctl is-active --quiet proftpd 2>/dev/null; then
+      ftp_active=1
+      reason+="proftpd 서비스가 활성 상태; "
+    fi
+  fi
+
+  # ==============================
+  # 3) xinetd ftp 확인
+  # ==============================
+  if [ -f /etc/xinetd.d/ftp ]; then
+    if grep -vE '^[[:space:]]*#|^[[:space:]]*$' /etc/xinetd.d/ftp 2>/dev/null | grep -iq "disable[[:space:]]*=[[:space:]]*no"; then
+      ftp_active=1
+      reason+="xinetd ftp 서비스가 활성(disable=no); "
+    fi
+  fi
+
+  # ==============================
+  # 4) inetd ftp 확인
+  # ==============================
+  if [ -f /etc/inetd.conf ]; then
+    if grep -vE '^[[:space:]]*#' /etc/inetd.conf 2>/dev/null | grep -iq "ftp"; then
+      ftp_active=1
+      reason+="inetd ftp 서비스 활성 설정 존재; "
+    fi
+  fi
+
+  # ==============================
+  # 판정
+  # ==============================
+  if [ "$ftp_active" -eq 1 ]; then
+    echo "※ U-54 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 암호화되지 않은 FTP 서비스가 활성 상태입니다. ($reason)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  echo "※ U-54 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " vsftpd / proftpd / xinetd / inetd 기반 FTP 서비스가 모두 비활성 상태입니다." >> "$resultfile" 2>&1
+  return 0
+}
 #수진
 U_55() {
     echo ""  >> $resultfile 2>&1
@@ -2598,6 +2860,102 @@ U_58() {
     echo " SNMP 서비스가 비활성화되어 있습니다." >> "$resultfile" 2>&1
   fi
 
+  return 0
+}
+#연수
+U_59() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-59(상) | UNIX > 3. 서비스 관리 > 안전한 SNMP 버전 사용 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : SNMP 서비스를 v3 이상으로 사용하는 경우" >> "$resultfile" 2>&1
+
+  local snmpd_conf="/etc/snmp/snmpd.conf"
+  local snmpd_persist="/var/lib/net-snmp/snmpd.conf"
+
+  local snmp_active=0
+  local cfg_files=()
+  local cfg_exists_count=0
+
+  local found_v1v2=0
+  local found_v3_user=0
+  local found_createuser=0
+  local found_sha=0
+  local found_aes=0
+
+  # 1) SNMP 서비스 활성 여부 확인 (미사용이면 N/A 처리)
+  if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet snmpd 2>/dev/null; then
+      snmp_active=1
+    fi
+  fi
+
+  if [ "$snmp_active" -eq 0 ]; then
+    echo "※ U-59 결과 : N/A" >> "$resultfile" 2>&1
+    echo " SNMP 서비스(snmpd)가 비활성/미사용 상태입니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2) 설정 파일 수집
+  if [ -f "$snmpd_conf" ]; then
+    cfg_files+=("$snmpd_conf")
+    ((cfg_exists_count++))
+  fi
+  if [ -f "$snmpd_persist" ]; then
+    cfg_files+=("$snmpd_persist")
+    ((cfg_exists_count++))
+  fi
+
+  if [ "$cfg_exists_count" -eq 0 ]; then
+    echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " snmpd는 활성 상태이나 설정 파일이 없습니다. ($snmpd_conf / $snmpd_persist 미존재)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 3) 설정 검사 (주석/공백 제외)
+  _scan_snmp_cfg() {
+    local f="$1"
+    grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$f" 2>/dev/null
+  }
+
+  for f in "${cfg_files[@]}"; do
+    # v1/v2c 흔적(community 기반) 있으면 취약
+    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*(rocommunity|rwcommunity|community|com2sec)[[:space:]]+'; then
+      found_v1v2=1
+    fi
+
+    # v3 사용자 권한(rouser/rwuser)
+    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*(rouser|rwuser)[[:space:]]+'; then
+      found_v3_user=1
+    fi
+
+    # createUser 존재 여부
+    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*createUser[[:space:]]+'; then
+      found_createuser=1
+    fi
+
+    # createUser 라인에서 SHA/AES 사용 확인
+    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*createUser[[:space:]].*(SHA|SHA1|SHA224|SHA256|SHA384|SHA512)'; then
+      found_sha=1
+    fi
+    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*createUser[[:space:]].*(AES|AES128|AES192|AES256)'; then
+      found_aes=1
+    fi
+  done
+
+  # 4) 판정
+  if [ "$found_v1v2" -eq 1 ]; then
+    echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " SNMP v1/v2c(community 기반) 설정이 존재합니다. (rocommunity/rwcommunity/com2sec 등)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  if [ "$found_v3_user" -eq 1 ] && [ "$found_createuser" -eq 1 ] && [ "$found_sha" -eq 1 ] && [ "$found_aes" -eq 1 ]; then
+    echo "※ U-59 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " SNMPv3 설정이 확인되었습니다. (createUser: SHA 인증 + AES 암호화, rouser/rwuser 권한 존재)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+  echo " snmpd는 활성 상태이나 SNMPv3 필수 설정이 미흡합니다. (createUser(SHA+AES) 또는 rouser/rwuser 미확인)" >> "$resultfile" 2>&1
   return 0
 }
 #수진
@@ -2782,6 +3140,70 @@ U_63() {
     echo " 현재 소유자: $owner, 권한: $perm" >> "$resultfile" 2>&1
   fi
 
+  return 0
+}
+#연수
+U_64() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-64(상) | UNIX > 4. 패치 관리 > 주기적 보안 패치 및 벤더 권고사항 적용 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 패치 적용 정책을 수립하여 주기적으로 패치관리를 수행하고 최신 보안 패치 및 Kernel이 적용된 경우" >> "$resultfile" 2>&1
+
+  local os_name="" os_ver=""
+  local kernel_running=""
+  local latest_kernel=""
+  local evidence=""
+  local pending_sec=0
+
+  # OS/Kernel 기본 정보
+  if [ -r /etc/os-release ]; then
+    . /etc/os-release
+    os_name="$NAME"
+    os_ver="$VERSION_ID"
+  fi
+  kernel_running="$(uname -r 2>/dev/null)"
+
+  # 1) Rocky 9.x 여부
+  if ! echo "$os_name" | grep -qi "Rocky" || ! echo "$os_ver" | grep -q "^9"; then
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " Rocky 9.x 환경이 아닙니다. (현재: $os_name $os_ver)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2) 보안 업데이트 대기 여부
+  if ! command -v dnf >/dev/null 2>&1; then
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " dnf 명령 확인 불가로 보안 패치 적용 여부를 확인할 수 없습니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  if dnf -q updateinfo list --updates security 2>/dev/null | grep -q .; then
+    pending_sec=1
+  fi
+
+  if [ "$pending_sec" -eq 1 ]; then
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 보안 업데이트(SECURITY) 미적용 대기 항목이 존재합니다. (dnf updateinfo 기준)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 3) 커널 최신/재부팅 필요 여부
+  latest_kernel="$(rpm -q kernel --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V | tail -n1)"
+
+  if [ -n "$latest_kernel" ]; then
+    if ! echo "$kernel_running" | grep -q "$latest_kernel"; then
+      echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+      echo " 최신 커널이 적용되지 않았거나 재부팅이 필요합니다. (running=$kernel_running, latest=$latest_kernel)" >> "$resultfile" 2>&1
+      return 0
+    fi
+  else
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 설치된 커널 정보를 확인하지 못했습니다. (rpm -q kernel 확인 실패)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 양호
+  echo "※ U-64 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " Rocky 9.x 환경이며 보안 업데이트 대기 없음 + 최신 커널 적용 확인됨. (kernel=$kernel_running)" >> "$resultfile" 2>&1
   return 0
 }
 #수진
@@ -6991,26 +7413,32 @@ U_35
 U_36
 U_37
 U_38
+U_39
 U_40
 U_41
 U_42
 U_43
+U_44
 U_45
 U_46
 U_47
 U_48
+U_49
 U_50
 U_51
 U_52
 U_53
+U_54
 U_55
 U_56
 U_57
 U_58
+U_59
 U_60
 U_61
 U_62
 U_63
+U_64
 U_65
 U_66
 U_67
