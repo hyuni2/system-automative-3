@@ -13,15 +13,15 @@ read -p "번호 입력 (1-3): " choice
 
 case $choice in
     1)
-        TARGET_SCRIPT="OS_Scripts/RHEL-family/Rocky9.sh"
+        TARGET_SCRIPT="src/OS_Scripts/RHEL-family/Rocky9.sh"
         OS_NAME="Rocky 9"
         ;;
     2)
-        TARGET_SCRIPT="OS_Scripts/RHEL-family/Rocky10.sh"
+        TARGET_SCRIPT="src/OS_Scripts/RHEL-family/Rocky10.sh"
         OS_NAME="Rocky 10"
         ;;
     3)
-        TARGET_SCRIPT="OS_Scripts/Debian-family/Ubuntu2404.sh"
+        TARGET_SCRIPT="src/OS_Scripts/Debian-family/Ubuntu24.sh"
         OS_NAME="Ubuntu 24.04"
         ;;
     *)

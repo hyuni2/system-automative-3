@@ -360,7 +360,7 @@ U_10() {
     echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : 동일한 UID로 설정된 사용자 계정이 존재하지 않는 경우" >> $resultfile 2>&1
     if [ -f /etc/passwd ]; then
-        if [ `awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l` -gt 0 ]; then
+        if [ "$(awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l)" -gt 0 ]; then
             echo "※ U-10 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
             echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> $resultfile 2>&1
         fi
@@ -505,24 +505,28 @@ U_14() {
     DETAILS=""
 
     # 1. 현재 실행 중인 쉘의 런타임 PATH 점검
-    # 패턴: 맨 앞이 .이거나(:|^.), 중간에 빈 경로(::) 또는 (:.:)가 포함된 경우
-    if echo "$PATH" | grep -qE '^\.:|:.:|^:|::'; then
+    if echo "$PATH" | grep -qE '^\.:|:.:|^:|::|:$'; then
         VULN_FOUND=1
-        DETAILS="[Runtime] 현재 PATH 환경변수 내 우선순위 높은 '.' 또는 '::' 발견: $PATH"
+        DETAILS="[Runtime] 현재 PATH 내 우선순위 높은 '.' 또는 '::' 발견: $PATH"
     fi
 
-    # 2. 시스템 공통 설정 파일 점검
+    # 2. 시스템 공통 설정 파일 점검 (Rocky Linux 9 최적화)
     if [ $VULN_FOUND -eq 0 ]; then
-        # OS별(Ubuntu/Rocky) 차이를 고려한 확장된 파일 목록
-        path_settings_files=("/etc/profile" "/etc/.login" "/etc/csh.cshrc" "/etc/csh.login" "/etc/environment" "/etc/bashrc" "/etc/bash.bashrc")
+        # Rocky 9에서 실제로 사용되는 주요 환경 설정 파일 목록
+        path_settings_files=("/etc/profile" "/etc/bashrc" "/etc/environment")
+        
+        # Rocky 9의 핵심 경로인 /etc/profile.d/*.sh 파일들을 점검 대상에 추가
+        for sh_file in /etc/profile.d/*.sh; do
+            [ -f "$sh_file" ] && path_settings_files+=("$sh_file")
+        done
         
         for file in "${path_settings_files[@]}"; do
             if [ -f "$file" ]; then
                 # 주석 제외 후 PATH 설정 라인 추출 및 패턴 매칭
                 VULN_LINE=$(grep -vE '^#|^\s#' "$file" | grep 'PATH=' | grep -E '=\.:|=\.|:\.:|::|:$')
-                if [ ! -z "$VULN_LINE" ]; then #취약한 path 설정 발견시
+                if [ ! -z "$VULN_LINE" ]; then
                     VULN_FOUND=1
-                    DETAILS="[System File] $file: $VULN_LINE" #어떤 파일, 어떤 라인인지 기록
+                    DETAILS="[System File] $file: $VULN_LINE"
                     break
                 fi
             fi
@@ -531,17 +535,17 @@ U_14() {
 
     # 3. 모든 사용자 홈 디렉터리 내 설정 파일 점검
     if [ $VULN_FOUND -eq 0 ]; then
-        user_dot_files=(".profile" ".cshrc" ".login" ".kshrc" ".bash_profile" ".bashrc" ".bash_login")
-        # /etc/passwd에서 실제 홈 디렉터리 추출 (불필요한 계정 제외)
+        # Rocky Linux에서 주로 사용되는 닷파일(.profile은 Ubuntu 계열에서 주로 사용하나 가이드 준수를 위해 유지)
+        user_dot_files=(".bash_profile" ".bashrc" ".profile" ".cshrc" ".login" ".kshrc")
+        
+        # /etc/passwd에서 실제 홈 디렉터리 추출
         user_homedirs=$(awk -F: '$7!="/bin/false" && $7!="/sbin/nologin" {print $6}' /etc/passwd | sort | uniq)
 
         for dir in $user_homedirs; do
             for dotfile in "${user_dot_files[@]}"; do
-                target="$dir/$dotfile" #실제 검사할 파일 경로 생성
-                if [ -f "$target" ]; then #일반파일이 존재하면 true
-                    VULN_LINE=$(grep -vE '^#|^\s#' "$target" \
-                                | grep 'PATH=' \
-                                | grep -E '=\.:|=\.|:\.:|::|:$')
+                target="$dir/$dotfile"
+                if [ -f "$target" ]; then
+                    VULN_LINE=$(grep -vE '^#|^\s#' "$target" | grep 'PATH=' | grep -E '=\.:|=\.|:\.:|::|:$')
                     if [ ! -z "$VULN_LINE" ]; then
                         VULN_FOUND=1
                         DETAILS="[User File] $target: $VULN_LINE"
@@ -945,6 +949,7 @@ U_23() {
   echo " 점검 대상 주요 실행 파일에서 SUID/SGID 설정이 확인되지 않았습니다." >> "$resultfile" 2>&1
   return 0
 }
+
 #연진
 U_24() {
     echo "" >> "$resultfile" 2>&1
@@ -954,58 +959,52 @@ U_24() {
     VULN=0
     REASON=""
   
-    # 1. 점검할 환경 변수 파일 지정
+    # 1. OS별 주요 점검 파일 지정
+    # Rocky: .bash_profile 중심 / Ubuntu: .profile 중심
     CHECK_FILES=(".profile" ".cshrc" ".login" ".kshrc" ".bash_profile" ".bashrc" ".bash_login" ".bash_logout" ".exrc" ".vimrc" ".netrc" ".forward" ".rhosts" ".shosts")
   
-    # 2. /etc/passwd에서 로그인 가능한 사용자 추출
+    # 2. 로그인 가능한 사용자 추출 (Ubuntu 24.04의 /usr/sbin/nologin 경로 고려)
     USER_LIST=$(awk -F: '$7!~/(nologin|false)/ {print $1":"$6}' /etc/passwd)
   
     for USER_INFO in $USER_LIST; do
         USER_NAME=$(echo "$USER_INFO" | cut -d: -f1)
         USER_HOME=$(echo "$USER_INFO" | cut -d: -f2)
     
-        # 3. 홈 디렉터리 존재 확인
         if [ -d "$USER_HOME" ]; then
             for FILE in "${CHECK_FILES[@]}"; do
                 TARGET="$USER_HOME/$FILE"
         
                 if [ -f "$TARGET" ]; then
-          
-                    # 4. 파일 소유자 확인 
-                    FILE_OWNER=$(ls -l "$TARGET" | awk '{print $3}')
+                    # 4. 파일 소유자 확인 (stat 명령어가 ls보다 결과값이 고정적임)
+                    FILE_OWNER=$(stat -c "%U" "$TARGET")
                     
-                    # [수정 1] 대괄호 뒤에 띄어쓰기 추가 ([ "$FILE_OWNER" ...)
                     if [ "$FILE_OWNER" != "root" ] && [ "$FILE_OWNER" != "$USER_NAME" ]; then
                         VULN=1
-                        REASON="$REASON 파일 소유자 불일치: $TARGET (소유자: $FILE_OWNER) |"
+                        REASON="$REASON [소유자 불일치] $TARGET (소유자: $FILE_OWNER) |"
                     fi
           
-                    # 5. 파일 권한 확인 
-                    PERM=$(ls -l "$TARGET")
+                    # 5. 파일 권한 확인 (8진수 권한 추출)
+                    PERM_OCT=$(stat -c "%a" "$TARGET") # 예: 644
                     
-                    # [수정 2] 변수명 통일 (PERMIT -> PERM)
-                    GROUP_WRITE=${PERM:5:1}
-                    OTHER_WRITE=${PERM:8:1}
-          
-                    # [수정 3] 변수 앞에 $ 추가 ("GROUP_WRITE" -> "$GROUP_WRITE")
-                    if [ "$GROUP_WRITE" == "w" ] || [ "$OTHER_WRITE" == "w" ]; then
+                    # 8진수 권한의 각 자리수 분리 (사용자/그룹/기타)
+                    # 그룹(2번째 자리) 또는 기타(3번째 자리)에 쓰기(2, 3, 6, 7) 권한이 있는지 확인
+                    if [[ "$PERM_OCT" =~ .[2367]. ]] || [[ "$PERM_OCT" =~ ..[2367] ]]; then
                         VULN=1
-                        # 여기서도 PERMIT -> PERM 으로 수정
-                        REASON="$REASON 권한 취약: $TARGET (권한: $PERM - 쓰기 권한 존재) |"
+                        REASON="$REASON [권한 취약] $TARGET (권한: $PERM_OCT) |"
                     fi
                 fi
             done
         fi
     done
   
-    # 결과 출력
     if [ $VULN -eq 1 ]; then
         echo "※ U-24 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-        echo " $REASON" >> "$resultfile" 2>&1
+        echo " [현황] $REASON" >> "$resultfile" 2>&1
     else
         echo "※ U-24 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
 }
+
 #수진
 U_25() {
     echo "" >> $resultfile 2>&1
@@ -1138,6 +1137,7 @@ U_28() {
   echo " 기본 차단 정책(ALL:ALL)이 적용되어 있으며 전체 허용 설정이 없습니다." >> "$resultfile" 2>&1
   return 0
 }
+
 #연진
 U_29() {
     echo "" >> "$resultfile" 2>&1
@@ -1178,6 +1178,7 @@ U_29() {
         echo "※ U-29 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
 }
+
 #수진
 U_30() {
     echo "" >> $resultfile 2>&1
