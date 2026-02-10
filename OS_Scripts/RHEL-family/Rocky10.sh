@@ -1,6 +1,205 @@
 #!/bin/bash
 resultfile="results.txt"
 
+#태훈
+U_02(){
+  #!/usr/bin/env bash
+# KISA U-02 (Linux) 비밀번호 관리정책 설정 점검 스크립트 (출력 최소)
+# - 진단 로직은 동일
+# - 출력은 "제목 1줄 + 판단기준 1줄 + 결과 1줄"만
+# - 취약 사유/참고/개선요약 등 추가 출력 없음
+
+set -u
+
+TARGET_PASS_MAX_DAYS=90
+TARGET_PASS_MIN_DAYS=1
+TARGET_MINLEN=8
+TARGET_CREDIT=-1
+TARGET_REMEMBER=4
+
+is_int(){ [[ "${1:-}" =~ ^-?[0-9]+$ ]]; }
+
+detect_pam_files() {
+  local id_like id name
+  id_like="$(. /etc/os-release 2>/dev/null; echo "${ID_LIKE:-}")"
+  id="$(. /etc/os-release 2>/dev/null; echo "${ID:-}")"
+  name="$(. /etc/os-release 2>/dev/null; echo "${NAME:-}")"
+
+  local -a files=()
+  if [[ "$id_like" == *rhel* || "$id_like" == *fedora* || "$id" == rocky || "$id" == rhel || "$id" == centos || "$name" == *Rocky* ]]; then
+    files+=("/etc/pam.d/system-auth" "/etc/pam.d/password-auth")
+  else
+    files+=("/etc/pam.d/common-password" "/etc/pam.d/system-auth" "/etc/pam.d/password-auth")
+  fi
+
+  for f in "${files[@]}"; do
+    [[ -r "$f" ]] && echo "$f"
+  done
+}
+
+append_conf_d() {
+  local dir="$1"
+  [[ -d "$dir" ]] || return 0
+  ls -1 "$dir"/*.conf 2>/dev/null | sort || true
+}
+
+get_kv_last() {
+  local key="$1"; shift
+  local files=("$@")
+  local val="" line f
+  for f in "${files[@]}"; do
+    [[ -r "$f" ]] || continue
+    while IFS= read -r line; do
+      [[ "$line" =~ ^[[:space:]]*# ]] && continue
+      [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+
+      if [[ "$line" =~ ^[[:space:]]*$key[[:space:]]*=[[:space:]]*([^[:space:]#]+) ]]; then
+        val="${BASH_REMATCH[1]}"
+      elif [[ "$line" =~ ^[[:space:]]*$key[[:space:]]+([^[:space:]#]+) ]]; then
+        val="${BASH_REMATCH[1]}"
+      elif [[ "$line" =~ ^[[:space:]]*$key([[:space:]]+|$) ]]; then
+        if [[ "$key" == "enforce_for_root" ]]; then
+          val="__FLAG_PRESENT__"
+        fi
+      fi
+    done < "$f"
+  done
+  [[ -n "$val" ]] && echo "$val" || echo ""
+}
+
+pam_check_order_onefile() {
+  local module="$1" pam_file="$2"
+  [[ -r "$pam_file" ]] || { echo "NA"; return 0; }
+
+  local mod_ln unix_ln
+  mod_ln="$(grep -nE "^[[:space:]]*password[[:space:]]+.*${module}\.so\b" "$pam_file" 2>/dev/null | head -n 1 | cut -d: -f1 || true)"
+  unix_ln="$(grep -nE "^[[:space:]]*password[[:space:]]+.*pam_unix\.so\b" "$pam_file" 2>/dev/null | head -n 1 | cut -d: -f1 || true)"
+
+  if [[ -n "$mod_ln" && -n "$unix_ln" ]]; then
+    (( mod_ln < unix_ln )) && echo "OK" || echo "BAD"
+  else
+    echo "NA"
+  fi
+}
+
+pam_extract_opt_firstline() {
+  local module="$1" key="$2"; shift 2
+  local -a pam_files=("$@")
+  local f line v
+  for f in "${pam_files[@]}"; do
+    [[ -r "$f" ]] || continue
+    line="$(grep -E "^[[:space:]]*password[[:space:]]+.*${module}\.so\b" "$f" 2>/dev/null | head -n 1 || true)"
+    [[ -z "$line" ]] && continue
+
+    v="$(echo "$line" | sed -n "s/.*\b${key}=\([^[:space:]]\+\).*/\1/p")"
+    [[ -n "$v" ]] && { echo "$v"; return 0; }
+
+    if [[ "$key" == "enforce_for_root" ]]; then
+      echo "$line" | grep -Eq "\benforce_for_root\b" && { echo "__FLAG_PRESENT__"; return 0; }
+    fi
+  done
+  echo ""
+}
+
+# -------------------- 진단 --------------------
+status="GOOD"
+
+mapfile -t PAM_FILES < <(detect_pam_files)
+if [[ "${#PAM_FILES[@]}" -eq 0 ]]; then
+  status="NA"
+fi
+
+# 1) /etc/login.defs
+if [[ "$status" != "NA" ]]; then
+  pass_max="$(get_kv_last "PASS_MAX_DAYS" "/etc/login.defs")"
+  pass_min="$(get_kv_last "PASS_MIN_DAYS" "/etc/login.defs")"
+
+  if ! is_int "${pass_max:-}" || (( pass_max > TARGET_PASS_MAX_DAYS )); then
+    status="VULN"
+  fi
+  if ! is_int "${pass_min:-}" || (( pass_min < TARGET_PASS_MIN_DAYS )); then
+    status="VULN"
+  fi
+fi
+
+# 2) pwquality
+if [[ "$status" == "GOOD" ]]; then
+  PWQUALITY_FILES=()
+  [[ -r /etc/security/pwquality.conf ]] && PWQUALITY_FILES+=("/etc/security/pwquality.conf")
+  while IFS= read -r f; do [[ -r "$f" ]] && PWQUALITY_FILES+=("$f"); done < <(append_conf_d "/etc/security/pwquality.conf.d")
+
+  # PAM 적용 여부(없으면 취약)
+  if ! grep -qE "^[[:space:]]*password[[:space:]]+.*pam_pwquality\.so\b" "${PAM_FILES[@]}" 2>/dev/null; then
+    status="VULN"
+  fi
+
+  # PAM 순서(하나라도 BAD면 취약)
+  for f in "${PAM_FILES[@]}"; do
+    [[ "$(pam_check_order_onefile "pam_pwquality" "$f")" == "BAD" ]] && { status="VULN"; break; }
+  done
+
+  # 값 체크
+  minlen="$(get_kv_last "minlen" "${PWQUALITY_FILES[@]}")"
+  dcredit="$(get_kv_last "dcredit" "${PWQUALITY_FILES[@]}")"
+  ucredit="$(get_kv_last "ucredit" "${PWQUALITY_FILES[@]}")"
+  lcredit="$(get_kv_last "lcredit" "${PWQUALITY_FILES[@]}")"
+  ocredit="$(get_kv_last "ocredit" "${PWQUALITY_FILES[@]}")"
+  enf_root="$(get_kv_last "enforce_for_root" "${PWQUALITY_FILES[@]}")"
+
+  [[ -z "$minlen" ]] && minlen="$(pam_extract_opt_firstline "pam_pwquality" "minlen" "${PAM_FILES[@]}")"
+  [[ -z "$dcredit" ]] && dcredit="$(pam_extract_opt_firstline "pam_pwquality" "dcredit" "${PAM_FILES[@]}")"
+  [[ -z "$ucredit" ]] && ucredit="$(pam_extract_opt_firstline "pam_pwquality" "ucredit" "${PAM_FILES[@]}")"
+  [[ -z "$lcredit" ]] && lcredit="$(pam_extract_opt_firstline "pam_pwquality" "lcredit" "${PAM_FILES[@]}")"
+  [[ -z "$ocredit" ]] && ocredit="$(pam_extract_opt_firstline "pam_pwquality" "ocredit" "${PAM_FILES[@]}")"
+  [[ -z "$enf_root" ]] && enf_root="$(pam_extract_opt_firstline "pam_pwquality" "enforce_for_root" "${PAM_FILES[@]}")"
+
+  if ! is_int "${minlen:-}" || (( minlen < TARGET_MINLEN )); then status="VULN"; fi
+  if ! is_int "${dcredit:-}" || (( dcredit != TARGET_CREDIT )); then status="VULN"; fi
+  if ! is_int "${ucredit:-}" || (( ucredit != TARGET_CREDIT )); then status="VULN"; fi
+  if ! is_int "${lcredit:-}" || (( lcredit != TARGET_CREDIT )); then status="VULN"; fi
+  if ! is_int "${ocredit:-}" || (( ocredit != TARGET_CREDIT )); then status="VULN"; fi
+  if [[ "$enf_root" != "__FLAG_PRESENT__" ]]; then status="VULN"; fi
+fi
+
+# 3) pwhistory
+if [[ "$status" == "GOOD" ]]; then
+  PWHISTORY_FILES=()
+  [[ -r /etc/security/pwhistory.conf ]] && PWHISTORY_FILES+=("/etc/security/pwhistory.conf")
+  while IFS= read -r f; do [[ -r "$f" ]] && PWHISTORY_FILES+=("$f"); done < <(append_conf_d "/etc/security/pwhistory.conf.d")
+
+  if ! grep -qE "^[[:space:]]*password[[:space:]]+.*pam_pwhistory\.so\b" "${PAM_FILES[@]}" 2>/dev/null; then
+    status="VULN"
+  fi
+
+  for f in "${PAM_FILES[@]}"; do
+    [[ "$(pam_check_order_onefile "pam_pwhistory" "$f")" == "BAD" ]] && { status="VULN"; break; }
+  done
+
+  remember="$(get_kv_last "remember" "${PWHISTORY_FILES[@]}")"
+  enf_root2="$(get_kv_last "enforce_for_root" "${PWHISTORY_FILES[@]}")"
+  [[ -z "$remember" ]] && remember="$(pam_extract_opt_firstline "pam_pwhistory" "remember" "${PAM_FILES[@]}")"
+  [[ -z "$enf_root2" ]] && enf_root2="$(pam_extract_opt_firstline "pam_pwhistory" "enforce_for_root" "${PAM_FILES[@]}")"
+
+  if ! is_int "${remember:-}" || (( remember < TARGET_REMEMBER )); then status="VULN"; fi
+  if [[ "$enf_root2" != "__FLAG_PRESENT__" ]]; then status="VULN"; fi
+fi
+
+# -------------------- 출력(딱 3줄) --------------------
+echo "▶ U-02(상) | 1. 계정관리 > 비밀번호 관리정책 설정 ◀"
+echo " 양호 판단 기준 : 비밀번호 최대/최소 사용기간, 복잡성(pwquality), 재사용 제한(pwhistory)이 기준에 맞고 PAM 적용 및 순서가 적절한 경우"
+
+if [[ "$status" == "GOOD" ]]; then
+  echo "* U-02 결과 : 양호 (Good)"
+  exit 0
+elif [[ "$status" == "NA" ]]; then
+  echo "* U-02 결과 : N/A"
+  exit 2
+else
+  echo "* U-02 결과 : 취약 (Vulnerable)"
+  exit 1
+fi
+}
+
 #연수
 U_03() {
   echo ""  >> "$resultfile" 2>&1
@@ -2175,6 +2374,7 @@ U_65() {
     fi
 }
 
+U_02
 U_03
 U_05
 U_08
