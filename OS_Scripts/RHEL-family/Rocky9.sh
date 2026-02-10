@@ -506,10 +506,10 @@ U_05() {
     echo " 양호 판단 기준 : root 계정과 동일한 UID를 갖는 계정이 존재하지 않는 경우" >> $resultfile 2>&1
     if [ -f /etc/passwd ]; then
         if [ `awk -F : '$3==0 {print $1}' /etc/passwd | grep -vx 'root' | wc -l` -gt 0 ]; then
-            echo "※ U-44 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+            echo "※ U-05 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
             echo " root 계정과 동일한 UID(0)를 갖는 계정이 존재합니다." >> $resultfile 2>&1
         else
-            echo "※ U-44 결과 : 양호(Good)" >> $resultfile 2>&1
+            echo "※ U-05 결과 : 양호(Good)" >> $resultfile 2>&1
         fi
     fi
 }
