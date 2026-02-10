@@ -510,7 +510,9 @@ elif st.session_state.page == "check":
 
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
         start_btn = st.button("🚀 진단 시작", use_container_width=True)
-
+        if start_btn:
+            st.session_state.pop("latest_result_ip", None)
+            st.session_state.pop("latest_result_df", None)
     st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
     st.divider()
     st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
@@ -558,7 +560,7 @@ elif st.session_state.page == "check":
     # =====================================================
     # RESULT REPORT (넓게)
     # =====================================================
-    if "latest_result_ip" in st.session_state:
+    if st.session_state.get("latest_result_ip"):
         recent_ip = st.session_state["latest_result_ip"]
         report_path = CURRENT_DIR / "reports" / f"{recent_ip}_result.txt"
 
