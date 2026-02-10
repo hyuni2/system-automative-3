@@ -88,20 +88,16 @@ html, body {
 }
 
 .block-container {
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
 
     padding-top: 0;
     padding-left: 0;
     padding-right: 0;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
 }
 
-.block-container {
-    padding-top: 0;
-    padding-left: 0;
-    padding-right: 0;
-}
 
 /* =====================================================
    2. HERO WRAPPER (Full Width)
@@ -271,6 +267,7 @@ button[data-testid="collapsedControl"]:hover {
 <style>
 /* Streamlit 전체 레이아웃을 flex column으로 */
 section[data-testid="stAppViewContainer"] {
+    padding-bottom: 0 !important;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -279,6 +276,10 @@ section[data-testid="stAppViewContainer"] {
 /* 메인 콘텐츠 영역 */
 section[data-testid="stAppViewContainer"] > .block-container {
     flex: 1;
+}
+
+section[data-testid="stMain"] {
+    padding-bottom: 0 !important;
 }
 </style>
 
@@ -440,7 +441,7 @@ if st.session_state.page == "main":
         <div class="hero">
             <div class="hero-content">
                 <h1>WEB 이름</h1>
-                <p>by 취약점팀</p>
+                <p>by 치약좋지</p>
             </div>
         </div>
     </div>
@@ -505,14 +506,16 @@ elif st.session_state.page == "check":
     _, center, _ = st.columns([1, 3, 1])
     with center:
         target_ip = st.text_input("대상 서버 IP", placeholder="192.168.x.x")
-        ssh_user = st.text_input("SSH 계정", value="rockylinux")
+        ssh_user = st.text_input("SSH 계정", value="")
         ssh_pw = st.text_input("SSH 비밀번호", type="password")
 
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
         start_btn = st.button("🚀 진단 시작", use_container_width=True)
+
         if start_btn:
             st.session_state.pop("latest_result_ip", None)
             st.session_state.pop("latest_result_df", None)
+
     st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
     st.divider()
     st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
@@ -605,7 +608,7 @@ elif st.session_state.page == "check":
 
                         st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
                         
-                        if st.button("📝 Word(.docx)로 저장"):
+                        if st.button("📝 Word(.docx)로 보관함 저장"):
                             df = st.session_state["latest_result_df"]
 
                             date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -617,7 +620,7 @@ elif st.session_state.page == "check":
                                 target_ip=st.session_state["latest_result_ip"]
                             )
 
-                            st.success(f"📁 Word 파일이 저장되었습니다: {docx_path.name}")
+                            st.success(f"📁 Word 파일이 보관함에 기록되었습니다: {docx_path.name}")
 
                             with open(str(docx_path), "rb") as f:
                                 docx_bytes = f.read()
@@ -628,6 +631,7 @@ elif st.session_state.page == "check":
                                 file_name=docx_path.name,
                                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                             )
+                        st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
 
                     else:
                         st.info("진단 결과가 존재하지 않습니다.")
@@ -677,7 +681,7 @@ elif st.session_state.page == "history":
         st.markdown(
             """
             <div style="
-                font-size: 18px;
+                font-size: 20px;
                 font-weight: 500;
                 margin-bottom: 12px;
             ">
@@ -686,7 +690,7 @@ elif st.session_state.page == "history":
             """,
             unsafe_allow_html=True
         )
-
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         HISTORY_DIR = CURRENT_DIR / "history"
         HISTORY_DIR.mkdir(exist_ok=True)
 
@@ -704,6 +708,13 @@ elif st.session_state.page == "history":
                         mime="text/csv",
                         key=f"download_{f.name}"
                     )
+    # ===============================
+    # FLEX SPACER (footer 밀어내기)
+    # ===============================
+    st.markdown(
+        "<div style='flex:1'></div>",
+        unsafe_allow_html=True
+    )
 
 # =========================================================
 # footer
@@ -713,7 +724,8 @@ st.markdown(f"""
 .app-footer {{
     width: 100%;
     margin-top: auto;
-    padding: 32px 0 24px;
+    margin-bottom: 0 !important;
+    padding: 12px 0;
     border-top: 1px solid #e5e5e5;
     background-color: #ffffff;
 }}
