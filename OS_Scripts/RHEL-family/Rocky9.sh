@@ -1247,9 +1247,9 @@ U_30() {
     for ((i=0; i<${#umask_settings_files[@]}; i++))
     do
         if [ -f ${umask_settings_files[$i]} ]; then
-            file_umask_count=`grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l`
+            file_umask_count=$(grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l)
             if [ $file_umask_count -gt 0 ]; then
-                umaks_value=(`grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'`)
+                umaks_value=($(grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'))
                 for ((j=0; j<${#umaks_value[@]}; j++))
                 do
                     if [ ${#umaks_value[$j]} -eq 2 ]; then
@@ -1289,7 +1289,7 @@ U_30() {
     done
 
     # 사용자 홈 디렉터리 설정 파일에서 umask 설정 확인
-    user_homedirectory_path=(`awk -F : '$7!="/bin/false" && $7!="/sbin/nologin" && $6!=null {print $6}' /etc/passwd | uniq`)
+    mapfile -t user_homedirectory_path < <(awk -F : '$7!="/bin/false" && $7!="/sbin/nologin" && $6!=null {print $6}' /etc/passwd | uniq)
     user_homedirectory_path2=(/home/*)
     for ((i=0; i<${#user_homedirectory_path2[@]}; i++))
     do
@@ -1301,9 +1301,9 @@ U_30() {
         for ((j=0; j<${#umask_settings_files[@]}; j++))
         do
             if [ -f ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} ]; then
-                user_homedirectory_setting_umask_count=`grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l`
+                user_homedirectory_setting_umask_count=$(grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l)
                 if [ $user_homedirectory_setting_umask_count -gt 0 ]; then
-                    umaks_value=(`grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'`)
+                    umaks_value=($(grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'))
                     for ((k=0; k<${#umaks_value[@]}; k++))
                     do
                         if [ ${#umaks_value[$k]} -eq 2 ]; then
