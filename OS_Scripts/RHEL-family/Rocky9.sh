@@ -1483,7 +1483,9 @@ U_34() {
     	else
         	echo "※ U-34 결과 : 양호(Good)" >> "$resultfile" 2>&1
     	fi
+  fi
 }
+
 #수진
 U_35() {
     vuln_flag=0
