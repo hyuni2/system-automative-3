@@ -1140,41 +1140,43 @@ U_28() {
 }
 #연진
 U_29() {
-	echo ""  >> $resultfile 2>&1
-	echo "▶ U-29(하) | 2. 파일 및 디렉토리 관리 > 2.16 hosts.lpd 파일 소유자 및 권한 설정 ◀"  >> $resultfile 2>&1
-	echo " 양호 판단 기준 :  /etc/hosts.lpd 파일이 존재하지 않거나, 불가피하게 사용 시 /etc/hosts.lpd 파일의 소유자가 root이고, 권한이 600 이하인 경우" >> $resultfile 2>&1
-	
-	VULN=0
-	REASON=""
-	TARGET="/etc/hosts.ldp"
-	
-	# 1. /etc/hosts.lpd 파일 존재 여부 확인
-	if [ -f "$TARGET" ]; then
-		OWNER=$(stat -c "%U" "$TARGET")
-		PERMIT=$(stat -c "%a" "$TARGET")
-	
-		# 2. 파일 소유자가 root인지 확인
-		if [ "$OWNER" != "root" ]; then
-			VULN=1
-			REASON="$REASON 파일의 소유자가 root가 아닙니다. (현재: $OWNER) "
-		fi
-		
-		# 3. 파일 권한 체크
-		if [ "$PERMIT" -gt 600 ]; then
-			VULN=1
-			REASON="$REASON 파일 권한이 600보다 큽니다. (현재: $PERMIT) "
-		fi
-	else
-		:
-	fi
-	
-	# 4. 결과 출력
-    	if [ $VULN -eq 1 ]; then
-        	echo "※ U-29 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-        	echo " $REASON" >> "$resultfile" 2>&1
-    	else
-        	echo "※ U-29 결과 : 양호(Good)" >> "$resultfile" 2>&1
-    	fi
+    echo "" >> "$resultfile" 2>&1
+    echo "▶ U-29(하) | 2. 파일 및 디렉토리 관리 > 2.16 hosts.lpd 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
+    echo " 양호 판단 기준 : /etc/hosts.lpd 파일이 존재하지 않거나, 소유자가 root이고 권한이 600 이하인 경우" >> "$resultfile" 2>&1
+  
+    VULN=0
+    REASON=""
+    
+    # [수정] ldp -> lpd 로 변경 (매우 중요!)
+    TARGET="/etc/hosts.lpd"
+  
+    # 1. /etc/hosts.lpd 파일 존재 여부 확인
+    if [ -f "$TARGET" ]; then
+        OWNER=$(stat -c "%U" "$TARGET")
+        PERMIT=$(stat -c "%a" "$TARGET")
+  
+        # 2. 파일 소유자가 root인지 확인
+        if [ "$OWNER" != "root" ]; then
+            VULN=1
+            REASON="$REASON 파일의 소유자가 root가 아닙니다(현재: $OWNER). |"
+        fi
+    
+        # 3. 파일 권한 체크
+        if [ "$PERMIT" -gt 600 ]; then
+            VULN=1
+            REASON="$REASON 파일 권한이 600보다 큽니다(현재: $PERMIT). |"
+        fi
+    else
+        :
+    fi
+  
+    # 4. 결과 출력
+    if [ $VULN -eq 1 ]; then
+        echo "※ U-29 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " $REASON" >> "$resultfile" 2>&1
+    else
+        echo "※ U-29 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    fi
 }
 #수진
 U_30() {
