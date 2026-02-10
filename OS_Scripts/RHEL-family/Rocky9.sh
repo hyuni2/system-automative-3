@@ -945,6 +945,64 @@ U_23() {
   echo " 점검 대상 주요 실행 파일에서 SUID/SGID 설정이 확인되지 않았습니다." >> "$resultfile" 2>&1
   return 0
 }
+#연진
+U_24() {
+	echo ""  >> $resultfile 2>&1
+	echo "▶ U-24(상) | 2. 파일 및 디렉토리 관리 > 2.11 사용자, 시스템 시작파일 및 환경파일 소유자 및 권한 설정 ◀"  >> $resultfile 2>&1
+	echo " 양호 판단 기준 : 홈 디렉터리 환경변수 파일 소유자가 root 또는, 해당 계정으로 지정되어 있고, 홈 디렉터리 환경변수 파일에 root와 소유자만 쓰기 권한이 부여된 경우"  >> $resultfile 2>&1
+	
+	VULN=0
+	REASON=""
+	
+	#1. 점검할 환경 변수 파일 지정
+	CHECK_FILES=(".profile" ".cshrc" ".login" ".kshrc" ".bash_profile" ".bashrc" ".bash_login" ".bash_logout" ".exrc" ".vimrc" ".netrc" ".forward" ".rhosts" ".shosts")
+	
+	
+	#2. /etc/passwd에서 로그인 가능한 사용자 추출 (false/nologin이 아닌사용자 추출 : 시스템이나 서비스 계정은 미포함 )
+	USER_LIST=$(awk -F: '$7!~/(nologin|false)/ {print $1":"$6}' /etc/passwd)
+	
+	for USER_INFO in $USER_LIST; do
+		USER_NAME=$(echo "$USER_INFO" | cut -d: -f1)
+        	USER_HOME=$(echo "$USER_INFO" | cut -d: -f2)
+		
+		# 3. 홈 디렉터리가 실제로 존재하는지를 먼저 확인
+		if [ -d "$USER_HOME" ]; then
+			for FILE in "${CHECK_FILES[@]}"; do
+				TARGET="$USER_HOME/$FILE"
+				
+				if [ -f "$TARGET" ]; then
+					
+					# 4. 파일의 소유자 먼저 확인 
+					FILE_OWNER=$(ls -l "$TARGET" | awk '{print $3}')
+					if [ "$FILE_OWNER" != "root" ] && ["$FILE_OWNER" != "$USER_NAME" ]; then
+						VULN=1
+						REASON="$REASON 파일 소유자가 불일치 합니다. $TARGET (소유자: $FILE_OWNER) |"
+					fi
+					
+					# 5. 파일의 권한 확인 
+					PERM=$(ls -l "$TARGET")
+					GROUP_WRITE=${PERMIT:5:1}
+					OTHER_WRITE=${PERMIT:8:1}
+					
+					if [ "GROUP_WRITE" == "w" ] || [ "$OTHER_WRITE" == "w" ]; then
+						VULN=1
+						REASON="$REASON 권한이 취약합니다. $TARGET (권한: $PERMIT - 쓰기 권한이 부여되어 있습니다.) |"
+					fi
+				fi
+			done
+		fi
+	done
+	
+	
+	# 결과 출력
+    	if [ $VULN -eq 1 ]; then
+        	echo "※ U-24 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        	echo " $REASON" >> "$resultfile" 2>&1
+    	else
+        	echo "※ U-24 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    	fi					
+
+}
 #수진
 U_25() {
     echo "" >> $resultfile 2>&1
@@ -1076,6 +1134,44 @@ U_28() {
   echo "※ U-28 결과 : 양호(Good)" >> "$resultfile" 2>&1
   echo " 기본 차단 정책(ALL:ALL)이 적용되어 있으며 전체 허용 설정이 없습니다." >> "$resultfile" 2>&1
   return 0
+}
+#연진
+U_29() {
+	echo ""  >> $resultfile 2>&1
+	echo "▶ U-29(하) | 2. 파일 및 디렉토리 관리 > 2.16 hosts.lpd 파일 소유자 및 권한 설정 ◀"  >> $resultfile 2>&1
+	echo " 양호 판단 기준 :  /etc/hosts.lpd 파일이 존재하지 않거나, 불가피하게 사용 시 /etc/hosts.lpd 파일의 소유자가 root이고, 권한이 600 이하인 경우" >> $resultfile 2>&1
+	
+	VULN=0
+	REASON=""
+	TARGET="/etc/hosts.ldp"
+	
+	# 1. /etc/hosts.lpd 파일 존재 여부 확인
+	if [ -f "$TARGET" ]; then
+		OWNER=$(stat -c "%U" "$TARGET")
+		PERMIT=$(stat -c "%a" "$TARGET")
+	
+		# 2. 파일 소유자가 root인지 확인
+		if [ "$OWNER" != "root" ]; then
+			VULN=1
+			REASON="$REASON 파일의 소유자가 root가 아닙니다. (현재: $OWNER) "
+		fi
+		
+		# 3. 파일 권한 체크
+		if [ "$PERMIT" -gt 600 ]; then
+			VULN=1
+			REASON="$REASON 파일 권한이 600보다 큽니다. (현재: $PERMIT) "
+		fi
+	else
+		:
+	fi
+	
+	# 4. 결과 출력
+    	if [ $VULN -eq 1 ]; then
+        	echo "※ U-29 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        	echo " $REASON" >> "$resultfile" 2>&1
+    	else
+        	echo "※ U-29 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    	fi
 }
 #수진
 U_30() {
@@ -1343,6 +1439,50 @@ U_33() {
   fi
 
   return 0
+}
+#연진
+U_34() {
+	echo ""  >> $resultfile 2>&1
+	echo "▶ U-34(상) | 3. 서비스 관리 > 3.1 Finger 서비스 비활성화 ◀"  >> $resultfile 2>&1
+	echo " 양호 판단 기준 : Finger 서비스가 비활성화된 경우" >> $resultfile 2>&1
+
+
+	VULN=0
+	REASON=""
+	
+	# 1. finger 서비스 실행 여부 확인 (systemctl)
+	SERVICES=("finger" "fingerd" "in.fingerd" "finger.socket")
+	for SVC in "${SERVICES[@]}"; do
+		if systemctl is-active "$SVC" >/dev/null 2>&1; then
+			VULN=1
+			REASON="$REASON Finger 서비스가 활성화되어 있습니다. |"
+		fi
+	done
+	
+	# 2. finger 프로세스 실행 여부 확인 
+	if ps -ef | grep -v grep | grep -Ei "fingerd|in.fingerd" >/dev/null; then
+		VULN=1
+		REASON="$REASON Finger 프로세스가 실행 중입니다. |"
+	fi
+	
+	# 3. finger 포트 리스닝 여부 확인 
+	if command -v ss >/dev/null 2>&1; then
+		PORT_CHECK=$(ss -nlp | grep -w ":79")
+	else
+		PORT_CHECK=$(netstat -natp 2>/dev/null | grep -w ":79")
+	
+	if [ -n "$PORT_CHECK" ]; then
+		VULN=1
+		REASON="$REASON Finger 포트가 리스닝 중입니다. |"
+	fi
+	
+	# 4. 결과 출력 
+	if [ $VULN -eq 1 ]; then
+        	echo "※ U-34 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        	echo " $REASON" >> "$resultfile" 2>&1
+    	else
+        	echo "※ U-34 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    	fi
 }
 #수진
 U_35() {
