@@ -1384,6 +1384,65 @@ U_38() {
 
   return 0
 }
+#연수
+U_39() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-39(상) | UNIX > 3. 서비스 관리 > 불필요한 NFS 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 불필요한 NFS 서비스 관련 데몬이 비활성화 되어 있는 경우" >> "$resultfile" 2>&1
+
+  local found=0
+  local reason=""
+
+  # 0) Ubuntu 24.04 기준: NFS "서버" 데몬 중심으로 판정 (클라이언트 오탐 방지)
+  # 핵심 서버 판단: nfs-server.service active OR rpc.nfsd/mountd 프로세스 존재
+
+  # 1) systemd 기반 서비스 체크 (Ubuntu)
+  if command -v systemctl >/dev/null 2>&1; then
+    # NFS 서버 서비스가 활성인지
+    if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "nfs-server.service"; then
+      if systemctl is-active --quiet nfs-server.service 2>/dev/null; then
+        found=1
+        reason+="nfs-server.service active; "
+      fi
+    fi
+
+    # rpcbind가 활성인지만으로는 NFS 서버 확정이 아님(다른 RPC 서비스도 사용 가능)
+    if [ "$found" -eq 0 ]; then
+      if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "rpcbind.service"; then
+        if systemctl is-active --quiet rpcbind.service 2>/dev/null; then
+          reason+="rpcbind.service active(보조 근거); "
+        fi
+      fi
+    fi
+  fi
+
+  # 2) 프로세스 기반 확인 (Ubuntu에서 확실한 서버 프로세스 위주)
+  # rpc.nfsd / rpc.mountd 가 있으면 NFS 서버로 간주
+  if ps -ef 2>/dev/null | grep -E 'rpc\.nfsd|[[:space:]]nfsd([[:space:]]|$)|rpc\.mountd|[[:space:]]mountd([[:space:]]|$)' \
+    | grep -v grep >/dev/null 2>&1; then
+    found=1
+    reason+="rpc.nfsd/mountd 프로세스 실행 중; "
+  fi
+
+  # 3) 보조 프로세스(클라이언트/부가) 확인: 이것만으로는 취약 판정 X
+  # 단, found=1일 때 근거 설명을 풍부하게 하기 위해 추가
+  if [ "$found" -eq 1 ]; then
+    if ps -ef 2>/dev/null | grep -iE 'rpcbind|rpc\.statd|statd|rpc\.idmapd|idmapd|gssd' \
+      | grep -ivE 'grep|kblockd|rstatd' >/dev/null 2>&1; then
+      reason+="(보조) rpc/statd/idmapd/gssd 등 관련 프로세스도 확인됨; "
+    fi
+  fi
+
+  if [ "$found" -eq 1 ]; then
+    echo "※ U-39 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 불필요한 NFS 서버 서비스/데몬이 실행 중입니다. ($reason)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  echo "※ U-39 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " NFS 서버 서비스/데몬(nfs-server, rpc.nfsd, rpc.mountd)이 비활성/미사용 상태입니다." >> "$resultfile" 2>&1
+  return 0
+}
 #수진
 U_40() {
     echo "" >> "$resultfile" 2>&1
@@ -1550,6 +1609,99 @@ U_43() {
     echo " - $e" >> "$resultfile" 2>&1
   done
 
+  return 0
+}
+#연수
+U_44() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-44(상) | UNIX > 3. 서비스 관리 > tftp, talk 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : tftp, talk, ntalk 서비스가 비활성화 되어 있는 경우" >> "$resultfile" 2>&1
+
+  # Ubuntu 24.04 기준: tftp는 tftpd-hpa/atftpd + socket 형태까지 고려
+  local services=("tftp" "talk" "ntalk")
+
+  # 1) systemd 서비스/소켓 체크 (활성/동작 중이면 취약)
+  if command -v systemctl >/dev/null 2>&1; then
+    # Ubuntu에서 자주 쓰는 유닛/소켓 포함
+    local units=(
+      "tftpd-hpa.service"
+      "atftpd.service"
+      "tftp.service"
+      "tftp.socket"
+      "tftpd.socket"
+      "tftpd-hpa.socket"
+      "talk.service"
+      "ntalk.service"
+      "talkd.service"
+      "ntalkd.service"
+      "inetd.service"
+      "openbsd-inetd.service"
+      "xinetd.service"
+    )
+
+    for u in "${units[@]}"; do
+      # 등록되어 있고 active이면 취약
+      if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$u"; then
+        if systemctl is-active --quiet "$u" 2>/dev/null; then
+          echo "※ U-44 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+          echo " tftp/talk/ntalk 관련 서비스가 systemd에서 활성 상태입니다. (unit=$u)" >> "$resultfile" 2>&1
+          return 0
+        fi
+      fi
+    done
+
+    # 혹시 이름이 다른 tftp 계열이 있는 경우를 위해 보조 검사
+    if systemctl list-units --type=service --all 2>/dev/null | grep -Eiq 'tftp|tftpd|talk|ntalk'; then
+      # 위에서 이미 잡혔으면 return 됐을 거라, 여기서는 소켓/서비스가 목록에 존재하는지 확인 후 active를 한 번 더 본다
+      if systemctl list-units --type=service 2>/dev/null | grep -Eiq 'tftp|tftpd|talk|ntalk'; then
+        echo "※ U-44 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " tftp/talk/ntalk 관련 서비스가 systemctl 목록에서 동작 중으로 확인됩니다." >> "$resultfile" 2>&1
+        return 0
+      fi
+    fi
+  fi
+
+  # 2) xinetd 설정 체크 (disable=yes가 아니면 취약) - Ubuntu에선 흔치 않지만 있으면 확인
+  if [ -d /etc/xinetd.d ]; then
+    for s in "${services[@]}"; do
+      if [ -f "/etc/xinetd.d/$s" ]; then
+        local disable_line
+        disable_line="$(grep -vE '^[[:space:]]*#|^[[:space:]]*$' "/etc/xinetd.d/$s" 2>/dev/null \
+          | grep -Ei '^[[:space:]]*disable[[:space:]]*=' | tail -n 1)"
+        if ! echo "$disable_line" | grep -Eiq 'disable[[:space:]]*=[[:space:]]*yes'; then
+          echo "※ U-44 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+          echo " $s 서비스가 /etc/xinetd.d/$s 에서 비활성화(disable=yes)되어 있지 않습니다." >> "$resultfile" 2>&1
+          return 0
+        fi
+      fi
+    done
+  fi
+
+  # 3) inetd(openbsd-inetd) 설정 체크: /etc/inetd.conf 또는 /etc/inetd.d/* (Ubuntu는 openbsd-inetd 사용 가능)
+  if [ -f /etc/inetd.conf ]; then
+    for s in "${services[@]}"; do
+      if grep -vE '^[[:space:]]*#|^[[:space:]]*$' /etc/inetd.conf 2>/dev/null \
+        | grep -Eiq "(^|[[:space:]])$s([[:space:]]|$)"; then
+        echo "※ U-44 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " $s 서비스가 /etc/inetd.conf 파일에서 활성 상태(주석 아님)로 존재합니다." >> "$resultfile" 2>&1
+        return 0
+      fi
+    done
+  fi
+
+  if [ -d /etc/inetd.d ]; then
+    for s in "${services[@]}"; do
+      if grep -R --include="*" -nE "^[[:space:]]*($s)[[:space:]]" /etc/inetd.d 2>/dev/null | grep -q .; then
+        # 주석 제거까지 엄격히 하려면 파일별 파싱이 필요한데, 여기서는 존재 자체를 취약 근거로 처리
+        echo "※ U-44 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " $s 관련 설정이 /etc/inetd.d/ 디렉터리 내에 존재합니다. (openbsd-inetd 사용 가능성)" >> "$resultfile" 2>&1
+        return 0
+      fi
+    done
+  fi
+
+  echo "※ U-44 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " tftp/talk/ntalk 관련 서비스가 systemd/xinetd/inetd 설정에서 모두 비활성 상태입니다." >> "$resultfile" 2>&1
   return 0
 }
 #수진
@@ -1767,6 +1919,74 @@ U_48() {
 
   return 0
 }
+#연수
+U_49() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-49(상) | UNIX > 3. 서비스 관리 > DNS 보안 버전 패치 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : DNS 서비스를 사용하지 않거나 주기적으로 패치를 관리하고 있는 경우" >> "$resultfile" 2>&1
+
+  local bind_active=0
+  local bind_running=0
+  local bind_ver=""
+  local upg_bind=0
+
+  # 1) DNS 서비스 사용 여부 (Ubuntu: bind9)
+  if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet bind9 2>/dev/null; then
+      bind_active=1
+    fi
+  fi
+
+  # 프로세스(named)로도 보조 확인 (컨테이너/수동 실행 케이스)
+  if ps -ef 2>/dev/null | grep -E '[[:space:]]named([[:space:]]|$)|/named' | grep -v grep >/dev/null 2>&1; then
+    bind_running=1
+  fi
+
+  # 서비스 미사용이면 양호
+  if [ "$bind_active" -eq 0 ] && [ "$bind_running" -eq 0 ]; then
+    echo "※ U-49 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " DNS 서비스(bind9/named)가 비활성/미사용 상태입니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2) BIND 버전 확인 (근거 출력용)
+  # Ubuntu에서는 named -v가 있을 수도/없을 수도 있어서 dpkg로도 확인
+  if command -v named >/dev/null 2>&1; then
+    bind_ver="$(named -v 2>/dev/null | grep -Eo '([0-9]+\.){2}[0-9]+' | head -n 1)"
+  fi
+
+  if [ -z "$bind_ver" ] && command -v dpkg-query >/dev/null 2>&1; then
+    # bind9 패키지 버전에서 x.y.z 형태만 추출
+    bind_ver="$(dpkg-query -W -f='${Version}\n' bind9 2>/dev/null | grep -Eo '([0-9]+\.){2}[0-9]+' | head -n 1)"
+  fi
+
+  [ -z "$bind_ver" ] && bind_ver="unknown"
+
+  # 3) 최신 패치 여부(업그레이드 대기) 확인 - Ubuntu용
+  if ! command -v apt >/dev/null 2>&1; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " DNS 서비스는 사용 중이나 apt 명령이 없어 패치 상태를 확인할 수 없습니다. (BIND=$bind_ver)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # apt 목록 갱신(환경에 따라 오래돼서 미탐 방지) - 에러는 무시
+  apt-get update -y >/dev/null 2>&1
+
+  # bind9 업그레이드 대기 여부 확인
+  if apt list --upgradable 2>/dev/null | grep -Eiq '^bind9/|^bind9-utils/|^bind9-host/|^dnsutils/'; then
+    upg_bind=1
+  fi
+
+  if [ "$upg_bind" -eq 1 ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " BIND(bind9) 관련 업그레이드 대기 항목이 존재합니다. (BIND=$bind_ver, apt upgradable 기준)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  echo "※ U-49 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " DNS 서비스 사용 중이며 BIND(bind9) 관련 업그레이드 대기 항목이 확인되지 않습니다. (BIND=$bind_ver)" >> "$resultfile" 2>&1
+  return 0
+}
 #수진
 U_50() {
     echo "" >> "$resultfile" 2>&1
@@ -1943,6 +2163,105 @@ U_53() {
 
   return 0
 }
+#연수
+U_54() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-54(중) | UNIX > 3. 서비스 관리 > 암호화되지 않는 FTP 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 암호화되지 않은 FTP 서비스가 비활성화된 경우" >> "$resultfile" 2>&1
+
+  local ftp_active=0
+  local reason=""
+
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "※ U-54 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " systemctl 명령을 사용할 수 없어 FTP 서비스 상태를 확인할 수 없습니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  _is_unit_active_if_exists() {
+    local unit="$1"
+    if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$unit"; then
+      if systemctl is-active --quiet "$unit" 2>/dev/null; then
+        return 0
+      fi
+    fi
+    return 1
+  }
+
+  # ==============================
+  # 1) vsftpd 확인 (Ubuntu에도 동일)
+  # ==============================
+  if _is_unit_active_if_exists "vsftpd.service"; then
+    ftp_active=1
+    reason+="vsftpd.service 활성; "
+  fi
+
+  # ==============================
+  # 2) proftpd 확인 (proftpd.service / proftpd@*.service 등)
+  # ==============================
+  # 등록된 proftpd 유닛이 하나라도 active면 취약
+  local pro_units
+  pro_units="$(systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -E '^proftpd(@.*)?\.service$' || true)"
+  if [ -n "$pro_units" ]; then
+    while IFS= read -r u; do
+      [ -z "$u" ] && continue
+      if systemctl is-active --quiet "$u" 2>/dev/null; then
+        ftp_active=1
+        reason+="$u 활성; "
+      fi
+    done <<< "$pro_units"
+  fi
+
+  # ==============================
+  # 3) pure-ftpd 확인 (Ubuntu에서 종종 사용)
+  # ==============================
+  if _is_unit_active_if_exists "pure-ftpd.service"; then
+    ftp_active=1
+    reason+="pure-ftpd.service 활성; "
+  fi
+
+  # ==============================
+  # 4) xinetd ftp 확인 (Ubuntu에서는 드물지만 있으면 체크)
+  # ==============================
+  if [ -f /etc/xinetd.d/ftp ]; then
+    if grep -vE '^[[:space:]]*#|^[[:space:]]*$' /etc/xinetd.d/ftp 2>/dev/null \
+      | grep -Eiq "disable[[:space:]]*=[[:space:]]*no"; then
+      ftp_active=1
+      reason+="xinetd ftp 활성(disable=no); "
+    fi
+  fi
+
+  # ==============================
+  # 5) inetd(openbsd-inetd) ftp 확인
+  # ==============================
+  if [ -f /etc/inetd.conf ]; then
+    if grep -vE '^[[:space:]]*#|^[[:space:]]*$' /etc/inetd.conf 2>/dev/null | grep -Eiq '(^|[[:space:]])ftp([[:space:]]|$)'; then
+      ftp_active=1
+      reason+="inetd.conf ftp 활성 설정 존재; "
+    fi
+  fi
+
+  if [ -d /etc/inetd.d ]; then
+    # /etc/inetd.d/ 안에 ftp 관련 설정이 존재하면 활성 가능성으로 취약 처리
+    if grep -R --include="*" -nEi '(^|[[:space:]])ftp([[:space:]]|$)' /etc/inetd.d 2>/dev/null | grep -q .; then
+      ftp_active=1
+      reason+="/etc/inetd.d 내 ftp 관련 설정 존재; "
+    fi
+  fi
+
+  # ==============================
+  # 판정
+  # ==============================
+  if [ "$ftp_active" -eq 1 ]; then
+    echo "※ U-54 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 암호화되지 않은 FTP 서비스가 활성 상태입니다. ($reason)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  echo "※ U-54 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " vsftpd/proftpd/pure-ftpd 및 inetd/xinetd 기반 FTP 서비스가 모두 비활성 상태입니다." >> "$resultfile" 2>&1
+  return 0
+}
 #수진
 U_55() {
     echo "" >> "$resultfile" 2>&1
@@ -2101,6 +2420,108 @@ U_58() {
     echo " SNMP 서비스가 비활성화되어 있습니다." >> "$resultfile" 2>&1
   fi
 
+  return 0
+}
+#연수
+U_59() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-59(상) | UNIX > 3. 서비스 관리 > 안전한 SNMP 버전 사용 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : SNMP 서비스를 v3 이상으로 사용하는 경우" >> "$resultfile" 2>&1
+
+  # Ubuntu 24.04 전용 경로 보강
+  local snmpd_conf="/etc/snmp/snmpd.conf"
+  local snmpd_persist1="/var/lib/net-snmp/snmpd.conf"
+  local snmpd_persist2="/var/lib/snmp/snmpd.conf"
+
+  local snmp_active=0
+  local cfg_files=()
+  local cfg_exists_count=0
+
+  local found_v1v2=0
+  local found_v3_user=0
+  local found_createuser=0
+  local found_sha=0
+  local found_aes=0
+
+  # 1) SNMP 서비스 활성 여부 확인 (미사용이면 N/A 처리)
+  if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet snmpd 2>/dev/null; then
+      snmp_active=1
+    fi
+  fi
+
+  if [ "$snmp_active" -eq 0 ]; then
+    echo "※ U-59 결과 : N/A" >> "$resultfile" 2>&1
+    echo " SNMP 서비스(snmpd)가 비활성/미사용 상태입니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2) 설정 파일 수집
+  if [ -f "$snmpd_conf" ]; then
+    cfg_files+=("$snmpd_conf")
+    ((cfg_exists_count++))
+  fi
+  if [ -f "$snmpd_persist1" ]; then
+    cfg_files+=("$snmpd_persist1")
+    ((cfg_exists_count++))
+  fi
+  if [ -f "$snmpd_persist2" ]; then
+    cfg_files+=("$snmpd_persist2")
+    ((cfg_exists_count++))
+  fi
+
+  if [ "$cfg_exists_count" -eq 0 ]; then
+    echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " snmpd는 활성 상태이나 설정 파일이 없습니다. ($snmpd_conf / $snmpd_persist1 / $snmpd_persist2 미존재)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 3) 설정 검사 (주석/공백 제외)
+  _scan_snmp_cfg() {
+    local f="$1"
+    grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$f" 2>/dev/null
+  }
+
+  for f in "${cfg_files[@]}"; do
+    # v1/v2c 흔적(community 기반) 있으면 취약
+    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*(rocommunity|rwcommunity|community|com2sec)[[:space:]]+'; then
+      found_v1v2=1
+    fi
+
+    # v3 사용자 권한(rouser/rwuser)
+    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*(rouser|rwuser)[[:space:]]+'; then
+      found_v3_user=1
+    fi
+
+    # createUser 존재 여부
+    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*createUser[[:space:]]+'; then
+      found_createuser=1
+    fi
+
+    # createUser 라인에서 SHA/AES 사용 확인
+    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*createUser[[:space:]].*(SHA|SHA1|SHA224|SHA256|SHA384|SHA512)'; then
+      found_sha=1
+    fi
+    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*createUser[[:space:]].*(AES|AES128|AES192|AES256)'; then
+      found_aes=1
+    fi
+  done
+
+  # 4) 판정
+  if [ "$found_v1v2" -eq 1 ]; then
+    echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " SNMP v1/v2c(community 기반) 설정이 존재합니다. (rocommunity/rwcommunity/com2sec 등)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  if [ "$found_v3_user" -eq 1 ] && [ "$found_createuser" -eq 1 ] && [ "$found_sha" -eq 1 ] && [ "$found_aes" -eq 1 ]; then
+    echo "※ U-59 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " SNMPv3 설정이 확인되었습니다. (createUser: SHA 인증 + AES 암호화, rouser/rwuser 권한 존재)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+  echo " snmpd는 활성 상태이나 SNMPv3 필수 설정이 미흡합니다. (createUser(SHA+AES) 또는 rouser/rwuser 미확인)" >> "$resultfile" 2>&1
   return 0
 }
 #수진
@@ -2267,6 +2688,83 @@ U_63() {
 
   return 0
 }
+#연수
+U_64() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-64(상) | UNIX > 4. 패치 관리 > 주기적 보안 패치 및 벤더 권고사항 적용 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 패치 적용 정책을 수립하여 주기적으로 패치관리를 수행하고 최신 보안 패치 및 Kernel이 적용된 경우" >> "$resultfile" 2>&1
+
+  local os_name="" os_ver=""
+  local kernel_running=""
+  local latest_kernel_pkg_ver=""
+  local pending_updates=0
+
+  # 0) OS/Kernel 기본 정보
+  if [ -r /etc/os-release ]; then
+    . /etc/os-release
+    os_name="$NAME"
+    os_ver="$VERSION_ID"
+  fi
+  kernel_running="$(uname -r 2>/dev/null)"
+
+  # 1) Ubuntu 24.04 여부
+  if ! echo "$os_name" | grep -qi "Ubuntu" || [ "$os_ver" != "24.04" ]; then
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " Ubuntu 24.04 환경이 아닙니다. (현재: $os_name $os_ver)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2) 업데이트 대기 여부 확인 (apt)
+  if ! command -v apt >/dev/null 2>&1; then
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " apt 명령 확인 불가로 보안 패치 적용 여부를 확인할 수 없습니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 목록 갱신(미탐 방지) - 실패해도 계속 진행
+  apt-get update -y >/dev/null 2>&1
+
+  # 업그레이드 대기 패키지가 있으면 취약 처리
+  if apt list --upgradable 2>/dev/null | grep -q "/"; then
+    pending_updates=1
+  fi
+
+  if [ "$pending_updates" -eq 1 ]; then
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 업데이트(패치) 미적용 대기 항목이 존재합니다. (apt upgradable 기준)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 3) 커널 최신/재부팅 필요 여부 확인
+  # 설치된 linux-image 패키지 중 최신 버전 추출
+  if command -v dpkg-query >/dev/null 2>&1; then
+    latest_kernel_pkg_ver="$(
+      dpkg-query -W -f='${Package}\t${Version}\n' 'linux-image-[0-9]*' 2>/dev/null \
+        | awk '{print $2}' \
+        | sort -V \
+        | tail -n 1
+    )"
+  fi
+
+  if [ -z "$latest_kernel_pkg_ver" ]; then
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 설치된 커널 패키지 정보를 확인하지 못했습니다. (dpkg-query linux-image-* 실패)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 실행 커널이 설치된 최신 커널 패키지와 크게 불일치하면(대부분 재부팅 필요 케이스)
+  # running 커널 문자열에 최신 패키지 버전의 일부(숫자/점/하이픈)가 포함되는지로 보수적으로 체크
+  if ! echo "$kernel_running" | grep -q "$(echo "$latest_kernel_pkg_ver" | grep -Eo '^[0-9]+\.[0-9]+\.[0-9]+' )"; then
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " 최신 커널 적용 여부가 불명확하거나 재부팅이 필요할 수 있습니다. (running=$kernel_running, latest_pkg=$latest_kernel_pkg_ver)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 양호
+  echo "※ U-64 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " Ubuntu 24.04 환경이며 업데이트 대기 없음 + 커널 적용 상태가 최신으로 확인됩니다. (kernel=$kernel_running)" >> "$resultfile" 2>&1
+  return 0
+}
 #수진
 U_65() {
     echo "" >> "$resultfile" 2>&1
@@ -2400,20 +2898,26 @@ U_33
 U_35
 U_36
 U_38
+U_39
 U_40
 U_41
 U_43
+U_44
 U_45
 U_46
 U_48
+U_49
 U_50
 U_51
 U_53
+U_54
 U_55
 U_56
 U_58
+U_59
 U_60
 U_61
 U_63
+U_64
 U_65
 U_66
