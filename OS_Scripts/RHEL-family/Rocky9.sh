@@ -1447,49 +1447,48 @@ U_33() {
 }
 #연진
 U_34() {
-	echo ""  >> $resultfile 2>&1
-	echo "▶ U-34(상) | 3. 서비스 관리 > 3.1 Finger 서비스 비활성화 ◀"  >> $resultfile 2>&1
-	echo " 양호 판단 기준 : Finger 서비스가 비활성화된 경우" >> $resultfile 2>&1
+    echo "" >> "$resultfile" 2>&1
+    echo "▶ U-34(상) | 3. 서비스 관리 > 3.1 Finger 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+    echo " 양호 판단 기준 : Finger 서비스가 비활성화된 경우" >> "$resultfile" 2>&1
 
-
-	VULN=0
-	REASON=""
-	
-	# 1. finger 서비스 실행 여부 확인 (systemctl)
-	SERVICES=("finger" "fingerd" "in.fingerd" "finger.socket")
-	for SVC in "${SERVICES[@]}"; do
-		if systemctl is-active "$SVC" >/dev/null 2>&1; then
-			VULN=1
-			REASON="$REASON Finger 서비스가 활성화되어 있습니다. |"
-		fi
-	done
-	
-	# 2. finger 프로세스 실행 여부 확인 
-	if ps -ef | grep -v grep | grep -Ei "fingerd|in.fingerd" >/dev/null; then
-		VULN=1
-		REASON="$REASON Finger 프로세스가 실행 중입니다. |"
-	fi
-	
-	# 3. finger 포트 리스닝 여부 확인 
-	if command -v ss >/dev/null 2>&1; then
-		PORT_CHECK=$(ss -nlp | grep -w ":79")
-	else
-		PORT_CHECK=$(netstat -natp 2>/dev/null | grep -w ":79")
-	
-	if [ -n "$PORT_CHECK" ]; then
-		VULN=1
-		REASON="$REASON Finger 포트가 리스닝 중입니다. |"
-	fi
-	
-	# 4. 결과 출력 
-	if [ $VULN -eq 1 ]; then
-        	echo "※ U-34 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-        	echo " $REASON" >> "$resultfile" 2>&1
-    	else
-        	echo "※ U-34 결과 : 양호(Good)" >> "$resultfile" 2>&1
-    	fi
-  fi
-}
+    VULN=0
+    REASON=""
+  
+    # 1. finger 서비스 실행 여부 확인 (systemctl)
+    SERVICES=("finger" "fingerd" "in.fingerd" "finger.socket")
+    for SVC in "${SERVICES[@]}"; do
+        if systemctl is-active "$SVC" >/dev/null 2>&1; then
+            VULN=1
+            REASON="$REASON Finger 서비스가 활성화되어 있습니다. |"
+        fi
+    done
+  
+    # 2. finger 프로세스 실행 여부 확인 
+    if ps -ef | grep -v grep | grep -Ei "fingerd|in.fingerd" >/dev/null; then
+        VULN=1
+        REASON="$REASON Finger 프로세스가 실행 중입니다. |"
+    fi
+  
+    # 3. finger 포트 리스닝 여부 확인 
+    if command -v ss >/dev/null 2>&1; then
+        PORT_CHECK=$(ss -nlp | grep -w ":79")
+    else
+        PORT_CHECK=$(netstat -natp 2>/dev/null | grep -w ":79")
+    fi  
+  
+    if [ -n "$PORT_CHECK" ]; then
+        VULN=1
+        REASON="$REASON Finger 포트가 리스닝 중입니다. |"
+    fi
+  
+    # 4. 결과 출력 
+    if [ $VULN -eq 1 ]; then
+        echo "※ U-34 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " $REASON" >> "$resultfile" 2>&1
+    else
+        echo "※ U-34 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    fi
+} # [수정] 맨 마지막에 있던 불필요한 fi 제거
 
 #수진
 U_35() {
