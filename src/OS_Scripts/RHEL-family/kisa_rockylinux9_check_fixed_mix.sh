@@ -1295,7 +1295,7 @@ U_30() {
     done
 
     # 사용자 홈 디렉터리 설정 파일에서 umask 설정 확인
-    user_homedirectory_path=(`awk -F : '$7!="/bin/false" && $7!="/sbin/nologin" && $6!=null {print $6}' /etc/passwd | uniq`)
+    mapfile -t user_homedirectory_path < <(awk -F : '$7!="/bin/false" && $7!="/sbin/nologin" && $6!=null {print $6}' /etc/passwd | uniq)
     user_homedirectory_path2=(/home/*)
     for ((i=0; i<${#user_homedirectory_path2[@]}; i++))
     do
@@ -1307,9 +1307,9 @@ U_30() {
         for ((j=0; j<${#umask_settings_files[@]}; j++))
         do
             if [ -f ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} ]; then
-                user_homedirectory_setting_umask_count=`grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l`
+                user_homedirectory_setting_umask_count=$(grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l)
                 if [ $user_homedirectory_setting_umask_count -gt 0 ]; then
-                    umaks_value=(`grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'`)
+                    umaks_value=($(grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'))
                     for ((k=0; k<${#umaks_value[@]}; k++))
                     do
                         if [ ${#umaks_value[$k]} -eq 2 ]; then
@@ -1548,8 +1548,8 @@ U_35() {
         done
     fi
     dedup() { printf "%s\n" "$@" | awk 'NF && !seen[$0]++'; }
-    VSFTPD_FILES=( $(dedup "${VSFTPD_FILES[@]}") )
-    PROFTPD_FILES=( $(dedup "${PROFTPD_FILES[@]}") )
+    mapfile -t VSFTPD_FILES < <(dedup "${VSFTPD_FILES[@]}")
+    mapfile -t PROFTPD_FILES < <(dedup "${PROFTPD_FILES[@]}")
     if [ "${#VSFTPD_FILES[@]}" -gt 0 ] || [ "${#PROFTPD_FILES[@]}" -gt 0 ]; then
         ftp_conf_found=1
     fi
@@ -1939,12 +1939,12 @@ U_40() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-40(상) | 3. 서비스 관리 > 3.7 NFS 접근 통제 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : 불필요한 NFS 서비스를 사용하지 않거나, 불가피하게 사용 시 everyone 공유를 제한한 경우" >> $resultfile 2>&1
-    if [ `ps -ef | grep -iE 'nfs|rpc.statd|statd|rpc.lockd|lockd' | grep -ivE 'grep|kblockd|rstatd|' | wc -l` -gt 0 ]; then
+    if [ "$(ps -ef | grep -iE 'nfs|rpc.statd|statd|rpc.lockd|lockd' | grep -ivE 'grep|kblockd|rstatd|' | wc -l)" -gt 0 ]; then
         if [ -f /etc/exports ]; then
-            etc_exports_all_count=`grep -vE '^#|^\s#' /etc/exports | grep '/' | grep '*' | wc -l`
-            etc_exports_insecure_count=`grep -vE '^#|^\s#' /etc/exports | grep '/' | grep -i 'insecure' | wc -l`
-            etc_exports_directory_count=`grep -vE '^#|^\s#' /etc/exports | grep '/' | wc -l`
-            etc_exports_squash_count=`grep -vE '^#|^\s#' /etc/exports | grep '/' | grep -iE 'root_squash|all_squash' | wc -l`
+            etc_exports_all_count=$(grep -vE '^#|^\s#' /etc/exports | grep '/' | grep '*' | wc -l)
+            etc_exports_insecure_count=$(grep -vE '^#|^\s#' /etc/exports | grep '/' | grep -i 'insecure' | wc -l)
+            etc_exports_directory_count=$(grep -vE '^#|^\s#' /etc/exports | grep '/' | wc -l)
+            etc_exports_squash_count=$(grep -vE '^#|^\s#' /etc/exports | grep '/' | grep -iE 'root_squash|all_squash' | wc -l)
             if [ $etc_exports_all_count -gt 0 ]; then
                 echo "※ U-40 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
                 echo " /etc/exports 파일에 '*' 설정이 있습니다." >> $resultfile 2>&1
@@ -2159,9 +2159,9 @@ U_45() {
     echo "▶ U-45(상) | 3. 서비스 관리 > 3.12 메일 서비스 버전 점검 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : 메일 서비스 버전이 최신버전인 경우" >> $resultfile 2>&1
     if [ -f /etc/services ]; then
-        smtp_port_count=`grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}' | wc -l`
+        smtp_port_count=$(grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}' | wc -l)
         if [ $smtp_port_count -gt 0 ]; then
-            smtp_port=(`grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}'`)
+            smtp_port=($(grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}'))
             for ((i=0; i<${#smtp_port[@]}; i++))
             do
                 netstat_smtp_count=`netstat -nat 2>/dev/null | grep -w 'tcp' | grep -Ei 'listen|established|syn_sent|syn_received' | grep ":${smtp_port[$i]} " | wc -l`
@@ -2177,10 +2177,10 @@ U_45() {
             done
         fi
     fi
-    ps_smtp_count=`ps -ef | grep -iE 'smtp|sendmail' | grep -v 'grep' | wc -l`
+    ps_smtp_count=$(ps -ef | grep -iE 'smtp|sendmail' | grep -v 'grep' | wc -l)
     if [ $ps_smtp_count -gt 0 ]; then
-        rpm_smtp_version=`rpm -qa 2>/dev/null | grep 'sendmail' | awk -F 'sendmail-' '{print $2}'`
-        dnf_smtp_version=`dnf list installed sendmail 2>/dev/null | grep -v 'Installed Packages' | awk '{print $2}'`
+        rpm_smtp_version=$(rpm -qa 2>/dev/null | grep 'sendmail' | awk -F 'sendmail-' '{print $2}')
+        dnf_smtp_version=$(dnf list installed sendmail 2>/dev/null | grep -v 'Installed Packages' | awk '{print $2}')
         if [[ $rpm_smtp_version != 8.18.2* ]] && [[ $dnf_smtp_version != 8.18.2* ]]; then
             echo "※ U-45 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
             echo " 메일 서비스 버전이 최신 버전(8.18.2)이 아닙니다." >> $resultfile 2>&1
@@ -2611,7 +2611,7 @@ U_53() {
   local banner=""
   if command -v timeout >/dev/null 2>&1; then
     if command -v nc >/dev/null 2>&1; then
-      banner=$((echo -e "QUIT\r\n"; sleep 0.2) | timeout 3 nc -n 127.0.0.1 21 2>/dev/null | head -n 1 | tr -d '\r')
+      banner=$( (echo -e "QUIT\r\n"; sleep 0.2) | timeout 3 nc -n 127.0.0.1 21 2>/dev/null | head -n 1 | tr -d '\r')
     else
       banner=$(timeout 3 bash -c '
         exec 3<>/dev/tcp/127.0.0.1/21 || exit 1
@@ -2967,7 +2967,7 @@ U_60() {
     vuln_flag=0
     community_found=0
     # SNMP 사용 여부 판단 - 미설치 시 양호
-    ps_snmp_count=`ps -ef | grep -iE 'snmpd|snmptrapd' | grep -v 'grep' | wc -l`
+    ps_snmp_count=$(ps -ef | grep -iE 'snmpd|snmptrapd' | grep -v 'grep' | wc -l)
     if [ $ps_snmp_count -eq 0 ]; then
         echo "※ U-60 결과 : 양호(Good)" >> $resultfile 2>&1
         echo " SNMP 서비스가 미설치되어있습니다." >> $resultfile 2>&1
@@ -4340,7 +4340,7 @@ U_12() {
       fi
     }
     
-    main "$@"
+    main
   ) >"$_tmp" 2>&1
   _rc=$?
 
@@ -4686,298 +4686,40 @@ if [[ "$_status" == "GOOD" ]]; then
     return 0
 }
 
-# ---- 통합 추가(U-27) ----
 U_27() {
-  local _tmp _rc
-  _tmp="$(mktemp)"
-  (
-    echo ""
-    #!/usr/bin/env bash
-    # ============================================================
-    # KISA 주요통신기반시설가이드 UNIX U-27
-    #  - $HOME/.rhosts, /etc/hosts.equiv 사용 금지(또는 안전 설정) 점검
-    # 대상: Rocky Linux 9 (systemd)
-    # 실행: sudo bash kisa_unix_u27_check_rocky9.sh
-    # 종료코드: 0=양호, 1=취약, 2=N/A(오류/판단불가)
-    # ============================================================
-    
-    set -u
-    LANG=C
-    LC_ALL=C
+    echo "" >> "$resultfile" 2>&1
+    echo "▶ U-27(상) | 2. 파일 및 디렉토리 관리 > 2.14 \$HOME/.rhosts, hosts.equiv 사용 금지 (Rocky 9) ◀" >> "$resultfile" 2>&1
     
     VULN=0
-    NA=0
-    
-    say(){ printf "%s\n" "$*"; }
-    hr(){  printf "%s\n" "------------------------------------------------------------"; }
-    
-    require_root() {
-      if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-        say "[N/A] root 권한으로 실행해야 합니다. (sudo 권장)"
-        exit 2
-      fi
-    }
-    
-    # mode_str(예: 600, 644) -> 정수(8진수로 해석)
-    mode_to_int() {
-      local mode_str="$1"
-      [[ "$mode_str" =~ ^[0-7]{3,4}$ ]] || return 1
-      printf "%d" "$((8#$mode_str))"
-    }
-    
-    # 권한: 그룹/기타 권한 없어야 함, 실행 비트 없어야 함
-    # 허용 예: 600, 400, 200, 000 (대체로 chmod 600 권장)
-    is_mode_safe_600_like() {
-      local mode_str="$1"
-      local mode_int
-      mode_int="$(mode_to_int "$mode_str")" || return 1
-    
-      # group/other any perms -> 불가
-      if (( (mode_int & 8#077) != 0 )); then
-        return 1
-      fi
-      # any execute bit (owner/group/other) -> 불가
-      if (( (mode_int & 8#111) != 0 )); then
-        return 1
-      fi
-      return 0
-    }
-    
-    # 주석(#) 제거 + 공백라인 제외 후 “+” 토큰(필드) 존재하면 취약
-    has_plus_token() {
-      local f="$1"
-      [[ -f "$f" ]] || return 1
-    
-      # 주석 제거는 # 이후를 잘라내는 방식
-      # “+” 토큰 탐지: 라인 시작 또는 공백 뒤에 + 가 있고, 뒤가 공백/끝
-      if awk '
-        {
-          gsub(/\r/,"");
-          line=$0;
-          sub(/#.*/,"",line);
-          if (line ~ /^[[:space:]]*$/) next;
-          if (line ~ /(^|[[:space:]])\+([[:space:]]|$)/) { exit 0; }
-        }
-        END { exit 1; }
-      ' "$f"; then
-        return 0
-      fi
-      return 1
-    }
-    
-    stat_owner_uid() { stat -c "%u" "$1" 2>/dev/null || return 1; }
-    stat_mode_str()  { stat -c "%a" "$1" 2>/dev/null || return 1; }
-    
-    check_file_common() {
-      # args: file_path expected_uid_or_empty allow_root_owner(0/1)
-      local f="$1"
-      local expected_uid="${2:-}"
-      local allow_root_owner="${3:-0}"
-    
-      local uid mode
-      uid="$(stat_owner_uid "$f")" || { NA=1; say "  [N/A] stat 실패: $f"; return; }
-      mode="$(stat_mode_str  "$f")" || { NA=1; say "  [N/A] stat 실패: $f"; return; }
-    
-      local owner_ok=0 perm_ok=0 plus_ok=0
-    
-      # 소유자 검사
-      if [[ -n "$expected_uid" ]]; then
-        if [[ "$uid" == "$expected_uid" ]]; then
-          owner_ok=1
-        elif [[ "$allow_root_owner" -eq 1 && "$uid" == "0" ]]; then
-          owner_ok=1
-        else
-          owner_ok=0
-        fi
-      else
-        owner_ok=1
-      fi
-    
-      # 권한 검사
-      if is_mode_safe_600_like "$mode"; then
-        perm_ok=1
-      else
-        perm_ok=0
-      fi
-    
-      # + 옵션 검사
-      if has_plus_token "$f"; then
-        plus_ok=0
-      else
-        plus_ok=1
-      fi
-    
-      if [[ "$owner_ok" -ne 1 || "$perm_ok" -ne 1 || "$plus_ok" -ne 1 ]]; then
-        VULN=1
-        say "  [취약] $f"
-        say "    - owner(uid)=$uid, mode=$mode"
-        if [[ "$owner_ok" -ne 1 ]]; then
-          if [[ -n "$expected_uid" ]]; then
-            say "    - 소유자 기준 불일치 (기준 uid=$expected_uid 또는 root(0) 허용 여부=$allow_root_owner)"
-          else
-            say "    - 소유자 기준 불일치"
-          fi
-        fi
-        if [[ "$perm_ok" -ne 1 ]]; then
-          say "    - 권한 기준 불일치 (그룹/기타 권한 또는 실행 권한 존재, 권장: 600)"
-        fi
-        if [[ "$plus_ok" -ne 1 ]]; then
-          say "    - '+' 옵션(전체 허용) 토큰 존재"
-        fi
-      else
-        say "  [양호] $f (owner(uid)=$uid, mode=$mode, '+' 없음)"
-      fi
-    }
-    
-    detect_r_services_hint() {
-      # “사용 여부”는 참고 정보로만 출력(가이드는 미사용이면 양호 가능)
-      # systemd 소켓/inetd/xinetd 흔적을 가볍게 탐지
-      local in_use=0
-      local found_any=0
-    
-      # systemd socket units
-      local unit
-      for unit in rsh.socket rlogin.socket rexec.socket; do
-        if systemctl list-unit-files --type=socket --no-legend 2>/dev/null | awk '{print $1}' | grep -qx "$unit"; then
-          found_any=1
-          if systemctl is-active "$unit" >/dev/null 2>&1 || systemctl is-enabled "$unit" >/dev/null 2>&1; then
-            in_use=1
-          fi
-        fi
-      done
-    
-      # xinetd config
-      local xf
-      for xf in /etc/xinetd.d/rsh /etc/xinetd.d/rlogin /etc/xinetd.d/rexec; do
-        if [[ -f "$xf" ]]; then
-          found_any=1
-          if grep -Eiq '^[[:space:]]*disable[[:space:]]*=[[:space:]]*no\b' "$xf"; then
-            in_use=1
-          fi
-        fi
-      done
-    
-      # inetd.conf entries (shell/login/exec)
-      if [[ -f /etc/inetd.conf ]]; then
-        if awk '
-          /^[[:space:]]*#/ {next}
-          /^[[:space:]]*$/ {next}
-          {svc=$1; if (svc=="shell" || svc=="login" || svc=="exec") { exit 0 } }
-          END { exit 1 }
-        ' /etc/inetd.conf; then
-          found_any=1
-          in_use=1
-        fi
-      fi
-    
-      if [[ "$found_any" -eq 0 ]]; then
-        say "r-command 서비스 사용 징후: 탐지되지 않음(참고)"
-      else
-        if [[ "$in_use" -eq 1 ]]; then
-          say "r-command 서비스 사용 징후: 있음(참고)"
-        else
-          say "r-command 서비스 사용 징후: 설정/유닛은 있으나 비활성로 보임(참고)"
-        fi
-      fi
-    }
-    
-    main() {
-      require_root
-    
-      say "▶ U-27 | $HOME/.rhosts, /etc/hosts.equiv 사용 금지 점검 (Rocky Linux 9)"
-      hr
-      detect_r_services_hint
-      hr
-      say "점검 결과:"
-    
-      local found=0
-    
-      # 1) /etc/hosts.equiv
-      if [[ -f /etc/hosts.equiv ]]; then
-        found=1
-        check_file_common "/etc/hosts.equiv" "0" "0"
-      else
-        say "  [정보] /etc/hosts.equiv 파일 없음"
-      fi
-    
-      # 2) 각 계정의 ~/.rhosts
-      # /etc/passwd의 홈디렉터리 기반으로 점검
-      while IFS=: read -r user _ uid _ _ home _; do
-        [[ -n "$user" && -n "$home" ]] || continue
-        [[ "$home" == /* ]] || continue
-        [[ -d "$home" ]] || continue
-    
-        local rf="${home}/.rhosts"
-        if [[ -f "$rf" ]]; then
-          found=1
-          # 가이드 문구 반영: 해당 계정(uid) 또는 root(0) 소유 허용
-          check_file_common "$rf" "$uid" "1"
-        fi
-      done < /etc/passwd
-    
-      if [[ "$found" -eq 0 ]]; then
-        say "  [양호] 점검 대상 파일(/etc/hosts.equiv, ~/.rhosts) 미존재 → r-command 설정 흔적 없음"
-        hr
-        say "최종판정: 양호"
-        exit 0
-      fi
-    
-      hr
-      if [[ "$NA" -eq 1 ]]; then
-        say "최종판정: N/A (일부 항목 점검 실패)"
-        exit 2
-      fi
-    
-      if [[ "$VULN" -eq 1 ]]; then
-        say "최종판정: 취약"
-        exit 1
-      else
-        say "최종판정: 양호"
-        exit 0
-      fi
-    }
-    
-    main "$@"
-  ) >"$_tmp" 2>&1
-  _rc=$?
+    DETAILS=""
 
-  echo "" >> "$resultfile" 2>&1
-  echo "▶ U-27 | $HOME/.rhosts, /etc/hosts.equiv 사용 금지 ◀" >> "$resultfile" 2>&1
-  echo " 양호 판단 기준 : /etc/hosts.equiv 및 각 계정의 ~/.rhosts 파일이 없거나, 존재 시 권한/소유자 설정이 안전하고 취약 설정이 없으면 양호" >> "$resultfile" 2>&1
-# 결과 판정(출력 문구 우선 파싱, 실패 시 종료코드 fallback)
-  local _status=""
-  local _line=""
-  _line="$(grep -E '(최종 결과|최종판정|결과|▶ 결과)[[:space:]]*[:：]' "$_tmp" 2>/dev/null | tail -n 1 || true)"
-  if echo "$_line" | grep -qE '취약'; then
-    _status="VULN"
-  elif echo "$_line" | grep -qE '양호'; then
-    _status="GOOD"
-  elif echo "$_line" | grep -qE 'N/A|판단불가|NA'; then
-    _status="NA"
-  else
-    if [[ "$_rc" -eq 0 ]]; then
-      _status="GOOD"
-    elif [[ "$_rc" -eq 1 ]]; then
-      _status="VULN"
-    else
-      _status="NA"
+    # 1. 서비스 확인: Rocky는 rsh-server 패키지 등을 사용
+    if systemctl list-units --type=service --all | grep -qiE 'rsh|rlogin|rexec'; then
+        R_ACTIVE=$(systemctl is-active rsh.socket rlogin.socket rexec.socket 2>/dev/null | grep 'active' || true)
+        [ -n "$R_ACTIVE" ] && DETAILS="[Service] r-command 서비스 활성화됨"
     fi
-  fi
-  
-if [[ "$_status" == "GOOD" ]]; then
-    echo "※ U-27 결과 : 양호(Good)" >> "$resultfile" 2>&1
-  elif [[ "$_status" == "VULN" ]]; then
-    echo "※ U-27 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-  else
-    echo "※ U-27 결과 : N/A" >> "$resultfile" 2>&1
-  fi
-  
-# 상세 출력 생략(요약만 출력)
-  rm -f "$_tmp"
-    return 0
+
+    # 2. /etc/hosts.equiv 점검
+    if [ -f "/etc/hosts.equiv" ]; then
+        PERM=$(stat -c "%a" /etc/hosts.equiv)
+        [ "$PERM" -gt 600 ] && VULN=1 && DETAILS="$DETAILS | /etc/hosts.equiv 권한 과다($PERM)"
+        grep -q "+" /etc/hosts.equiv && VULN=1 && DETAILS="$DETAILS | /etc/hosts.equiv 내 '+' 설정 존재"
+    fi
+
+    # 3. 사용자 .rhosts 점검 (UID 1000 이상 일반 사용자 타겟)
+    USER_HOMES=$(awk -F: '$3 >= 1000 && $7!~/(nologin|false)/ {print $1":"$6}' /etc/passwd)
+    for INFO in $USER_HOMES; do
+        U_NAME=$(echo "$INFO" | cut -d: -f1); U_HOME=$(echo "$INFO" | cut -d: -f2)
+        TARGET="$U_HOME/.rhosts"
+        if [ -f "$TARGET" ]; then
+            [ "$(stat -c "%a" "$TARGET")" -gt 600 ] && VULN=1 && DETAILS="$DETAILS | $U_NAME: .rhosts 권한 취약"
+            grep -q "+" "$TARGET" && VULN=1 && DETAILS="$DETAILS | $U_NAME: .rhosts '+' 존재"
+        fi
+    done
+
+    [ $VULN -eq 1 ] && echo "※ U-27 결과 : 취약(Vulnerable) - $DETAILS" >> "$resultfile" 2>&1 || echo "※ U-27 결과 : 양호(Good)" >> "$resultfile" 2>&1
 }
 
-# ---- 통합 추가(U-32) ----
 U_32() {
   local _tmp _rc
   _tmp="$(mktemp)"

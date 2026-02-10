@@ -1227,7 +1227,7 @@ U_25() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-25(상) | 2. 파일 및 디렉토리 관리 > 2.12 world writable 파일 점검 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : world writable 파일이 존재하지 않거나, 존재 시 설정 이유를 인지하고 있는 경우"  >> $resultfile 2>&1
-    if [ `find / -type f -perm -2 2>/dev/null | wc -l` -gt 0 ]; then
+    if [ "$(find / -type f -perm -2 2>/dev/null | wc -l)" -gt 0 ]; then
         echo "※ U-25 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
         echo " world writable 설정이 되어있는 파일이 있습니다." >> $resultfile 2>&1
     else
@@ -1432,7 +1432,7 @@ U_30() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-30(중) | 2. 파일 및 디렉토리 관리 > 2.17 UMASK 설정 관리 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : UMASK 값이 022 이상으로 설정된 경우" >> $resultfile 2>&1
-    umaks_value=`umask`
+    umaks_value=$(umask)
 
     if [ ${umaks_value:2:1} -lt 2 ]; then
         echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
@@ -1450,12 +1450,12 @@ U_30() {
         echo " 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
     fi
     if [ -f /etc/profile ]; then
-        umaks_value=($(
+        mapfile -t umaks_value < <(
             grep -vE '^[[:space:]]*#' /etc/profile \
             | grep -i 'umask' \
             | grep -vE 'if|=' \
             | awk '{print $2}'
-        ))
+        )
         for ((i=0; i<${#umaks_value[@]}; i++))
         do
             if [ ${#umaks_value[$i]} -eq 2 ]; then
@@ -1496,9 +1496,9 @@ U_30() {
     for ((i=0; i<${#umask_settings_files[@]}; i++))
     do
         if [ -f ${umask_settings_files[$i]} ]; then
-            file_umask_count=`grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l`
+            file_umask_count=$(grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l)
             if [ $file_umask_count -gt 0 ]; then
-                umaks_value=(`grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'`)
+                umaks_value=($(grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'))
                 for ((j=0; j<${#umaks_value[@]}; j++))
                 do
                     if [ ${#umaks_value[$j]} -eq 2 ]; then
@@ -1537,7 +1537,7 @@ U_30() {
         fi
     done
 
-    user_homedirectory_path=(`awk -F : '$7!="/bin/false" && $7!="/sbin/nologin" && $6!=null {print $6}' /etc/passwd | uniq`)
+    user_homedirectory_path=($(awk -F : '$7!="/bin/false" && $7!="/sbin/nologin" && $6!=null {print $6}' /etc/passwd | uniq))
     user_homedirectory_path2=(/home/*)
     for ((i=0; i<${#user_homedirectory_path2[@]}; i++))
     do
@@ -1549,9 +1549,9 @@ U_30() {
         for ((j=0; j<${#umask_settings_files[@]}; j++))
         do
             if [ -f ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} ]; then
-                user_homedirectory_setting_umask_count=`grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l`
+                user_homedirectory_setting_umask_count=$(grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l)
                 if [ $user_homedirectory_setting_umask_count -gt 0 ]; then
-                    umaks_value=(`grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'`)
+                    mapfile -t umaks_value < <(grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}')
                     for ((k=0; k<${#umaks_value[@]}; k++))
                     do
                         if [ ${#umaks_value[$k]} -eq 2 ]; then
