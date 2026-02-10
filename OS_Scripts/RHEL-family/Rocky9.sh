@@ -1200,12 +1200,12 @@ U_30() {
     # /etc/profile 파일 내 umask 설정 점검
     # 변수로 선언한 umask, 즉 umask=값 형태는 무시
     if [ -f /etc/profile ]; then
-        umaks_value=($(
+        mapfile -t umaks_value < <(
             grep -vE '^[[:space:]]*#' /etc/profile \
             | grep -i 'umask' \
             | grep -vE 'if|=' \
-            | awk '{print $2}'
-        ))
+            | awk '{print $2}' || true
+        )
         for ((i=0; i<${#umaks_value[@]}; i++))
         do
             if [ ${#umaks_value[$i]} -eq 2 ]; then
