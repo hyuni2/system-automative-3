@@ -397,13 +397,42 @@ U_03() {
 
 }
 
+#연진
+U_04() {
+    echo "" >> "$resultfile" 2>&1
+    echo "▶ U-04(상) | 1. 계정관리 > 1.4 패스워드 파일 보호 ◀" >> "$resultfile" 2>&1
+    echo " 양호 판단 기준 : shadow 패스워드를 사용하거나, 패스워드를 암호화하여 저장하는 경우" >> "$resultfile" 2>&1
+
+    # 1. /etc/passwd의 두 번째 필드가 'x'인지 확인
+    VULN_USERS=$(awk -F: '$2 != "x" {print $1}' /etc/passwd)
+
+    if [ -n "$VULN_USERS" ]; then
+        echo "※ U-04 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " [현황] shadow 패스워드를 사용하지 않는 계정 발견: $VULN_USERS" >> "$resultfile" 2>&1
+    else
+        # 2. Ubuntu 24 특화: /etc/shadow 파일 존재 및 접근 권한 추가 확인
+        if [ -f /etc/shadow ]; then
+            # shadow 파일은 root만 읽을 수 있어야 함 (보통 640 또는 600)
+            SHADOW_PERM=$(stat -c "%a" /etc/shadow)
+            if [ "$SHADOW_PERM" -le 640 ]; then
+                echo "※ U-04 결과 : 양호(Good)" >> "$resultfile" 2>&1
+            else
+                echo "※ U-04 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+                echo " [현황] /etc/shadow 파일의 권한이 너무 낮습니다(현재: $SHADOW_PERM)." >> "$resultfile" 2>&1
+            fi
+        else
+            echo "※ U-04 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+            echo " [현황] /etc/shadow 파일이 존재하지 않습니다." >> "$resultfile" 2>&1
+        fi
+    fi
+}
 
 U_05() {
 	echo ""  >> $resultfile 2>&1
 	echo "▶ U-05(상) | 1. 계정관리 > 1.5 root 이외의 UID가 '0' 금지 ◀"  >> $resultfile 2>&1
 	echo " 양호 판단 기준 : root 계정과 동일한 UID를 갖는 계정이 존재하지 않는 경우" >> $resultfile 2>&1
 	if [ -f /etc/passwd ]; then
-		if [ `awk -F : '$3==0 {print $1}' /etc/passwd | grep -vx 'root' | wc -l` -gt 0 ]; then
+    if [ "$(awk -F : '$3==0 {print $1}' /etc/passwd | grep -vx 'root' | wc -l)" -gt 0 ]; then
 			echo "※ U-05 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
 			echo " root 계정과 동일한 UID(0)를 갖는 계정이 존재합니다." >> $resultfile 2>&1
 			return 0
@@ -658,13 +687,47 @@ U_08() {
   return 0
 }
 
+#연진
+U_09() {
+    echo "" >> "$resultfile" 2>&1
+    echo "▶ U-09(하) | 1. 계정관리 > 1.12 계정이 존재하지 않는 GID 금지 ◀" >> "$resultfile" 2>&1
+    echo " 양호 판단 기준 : 시스템 관리나 운용에 불필요한 그룹이 삭제 되어있는 경우" >> "$resultfile" 2>&1
+
+    # 1. /etc/passwd에서 현재 사용 중인 모든 기본 GID 추출
+    USED_GIDS=$(awk -F: '{print $4}' /etc/passwd | sort -u)
+
+    # 2. Ubuntu 24 기준: 일반 사용자 그룹인 1000번 이상만 점검 대상으로 설정
+    CHECK_GIDS=$(awk -F: '$3 >= 1000 {print $3}' /etc/group)
+    
+    VULN_GROUPS=""
+    for gid in $CHECK_GIDS; do
+        # 해당 GID가 /etc/passwd의 기본 그룹으로 사용 중인지 확인
+        if ! echo "$USED_GIDS" | grep -qxw "$gid"; then
+            # 보조 그룹(Supplementary Group)으로 등록된 사용자가 있는지 추가 확인
+            MEMBER_EXISTS=$(grep "^[^:]*:[^:]*:$gid:" /etc/group | cut -d: -f4)
+            
+            if [ -z "$MEMBER_EXISTS" ]; then
+                GROUP_NAME=$(grep "^[^:]*:[^:]*:$gid:" /etc/group | cut -d: -f1)
+                VULN_GROUPS="$VULN_GROUPS $GROUP_NAME($gid)"
+            fi
+        fi
+    done
+
+    # 3. 결과 판정
+    if [ -n "$VULN_GROUPS" ]; then
+        echo "※ U-09 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " [현황] 계정이 존재하지 않는 불필요한 그룹(GID 1000 이상) 존재:$VULN_GROUPS" >> "$resultfile" 2>&1
+    else
+        echo "※ U-09 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    fi
+}
 
 U_10() {
 	echo ""  >> $resultfile 2>&1
 	echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀"  >> $resultfile 2>&1
 	echo " 양호 판단 기준 : 동일한 UID로 설정된 사용자 계정이 존재하지 않는 경우" >> $resultfile 2>&1
 	if [ -f /etc/passwd ]; then
-		if [ `awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l` -gt 0 ]; then
+    if [ "$(awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l)" -gt 0 ]; then
 			echo "※ U-10 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
 			echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> $resultfile 2>&1
 			return 0
@@ -806,9 +869,10 @@ U_12() {
 
 
 U_13() {
+  local shadow="/etc/shadow"
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-13(중) | UNIX > 1. 계정관리 > 안전한 비밀번호 암호화 알고리즘 사용 ◀"  >> "$resultfile" 2>&1
-  echo " 양호 판단 기준 : 안전한 알고리즘(yescrypt:$y$, SHA-2:$5/$6)을 사용하는 경우" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 안전한 알고리즘(yescrypt:\\\$y\\\$, SHA-2:\\\$5/\\\$6)을 사용하는 경우" >> "$resultfile" 2>&1
 
   local shadow="/etc/shadow"
 
@@ -872,10 +936,72 @@ U_13() {
   fi
 
   echo "※ U-13 결과 : 양호(Good)" >> "$resultfile" 2>&1
-  echo " 안전한 알고리즘(yescrypt:$y$, SHA-2:$5/$6)만 사용 중입니다. (점검계정 수: $checked)" >> "$resultfile" 2>&1
+  echo " 안전한 알고리즘(yescrypt:\$y\$, SHA-2:\$5/\$6)만 사용 중입니다. (점검계정 수: $checked)" >> "$resultfile" 2>&1
   return 0
 }
 
+#연진
+U_14() {
+    echo "" >> "$resultfile" 2>&1
+    echo "▶ U-14(상) | 2. 파일 및 디렉토리 관리 > 2.1 root 홈, 패스 디렉터리 권한 및 패스 설정 ◀" >> "$resultfile" 2>&1
+    echo " 양호 판단 기준 : PATH 환경변수에 \".\" 이 맨 앞이나 중간에 포함되지 않은 경우" >> "$resultfile" 2>&1
+
+    VULN_FOUND=0
+    DETAILS=""
+
+    # 1. 런타임 PATH 점검
+    if echo "$PATH" | grep -qE '^\.:|:.:|^:|::|:$'; then
+        VULN_FOUND=1
+        DETAILS="[Runtime] 현재 PATH 내 '.' 또는 '::' 발견: $PATH"
+    fi
+
+    # 2. Ubuntu 24 시스템 설정 파일 점검 (파일 명칭 주의)
+    if [ $VULN_FOUND -eq 0 ]; then
+        # Ubuntu는 /etc/bash.bashrc와 /etc/environment가 핵심입니다.
+        ubuntu_files=("/etc/profile" "/etc/bash.bashrc" "/etc/environment" "/etc/profile.d/*.sh")
+        
+        # /etc/environment는 PATH="경로" 형식으로 저장되므로 별도 체크가 필요할 수 있음
+        for file in /etc/profile /etc/bash.bashrc /etc/environment /etc/profile.d/*.sh; do
+            if [ -f "$file" ]; then
+                VULN_LINE=$(grep -vE '^#|^\s#' "$file" | grep 'PATH=' | grep -E '=\.:|=\.|:\.:|::|:$')
+                if [ ! -z "$VULN_LINE" ]; then
+                    VULN_FOUND=1
+                    DETAILS="[System File] $file: $VULN_LINE"
+                    break
+                fi
+            fi
+        done
+    fi
+
+    # 3. Ubuntu 사용자 홈 디렉터리 점검 ( .profile 중심 )
+    if [ $VULN_FOUND -eq 0 ]; then
+        # Ubuntu는 .bash_profile 대신 .profile을 기본으로 사용합니다.
+        user_dot_files=(".profile" ".bashrc" ".bash_login")
+        user_homedirs=$(awk -F: '$7!="/usr/sbin/nologin" && $7!="/bin/false" {print $6}' /etc/passwd | sort | uniq)
+
+        for dir in $user_homedirs; do
+            for dotfile in "${user_dot_files[@]}"; do
+                target="$dir/$dotfile"
+                if [ -f "$target" ]; then
+                    VULN_LINE=$(grep -vE '^#|^\s#' "$target" | grep 'PATH=' | grep -E '=\.:|=\.|:\.:|::|:$')
+                    if [ ! -z "$VULN_LINE" ]; then
+                        VULN_FOUND=1
+                        DETAILS="[User File] $target: $VULN_LINE"
+                        break 2
+                    fi
+                fi
+            done
+        done
+    fi
+
+    # 최종 출력
+    if [ $VULN_FOUND -eq 1 ]; then
+        echo "※ U-14 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " [현황] $DETAILS" >> "$resultfile" 2>&1
+    else
+        echo "※ U-14 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    fi
+}
 
 U_15() {
     echo "" >> $resultfile 2>&1
@@ -1066,6 +1192,55 @@ U_18() {
   return 0
 }
 
+#연진
+U_19() {
+    echo "" >> "$resultfile" 2>&1
+    echo "▶ U-19(상) | 2. 파일 및 디렉토리 관리 > 2.6 /etc/hosts 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
+    # Ubuntu 환경임을 리포트에 명시하고 싶을 경우 추가
+    echo " 점검 환경: Ubuntu 24.04 (Debian-family)" >> "$resultfile" 2>&1
+
+    # (stat 명령어는 Ubuntu에서도 표준으로 사용됨)
+    VULN_FOUND=0
+    DETAILS=""
+
+    # 1. 파일 존재 여부 확인
+    if [ -f "/etc/hosts" ]; then
+        # [Step 2] 소유자 확인 (UID 확인이 더 정확함)
+        FILE_OWNER_UID=$(stat -c "%u" /etc/hosts)
+        FILE_OWNER_NAME=$(stat -c "%U" /etc/hosts)
+        
+        # [Step 3] 권한 확인 (8진수 형태, 예: 644)
+        FILE_PERM=$(stat -c "%a" /etc/hosts)
+        
+        # 8진수 권한을 각 자리수별로 분리
+        #User, Group, Other 순서 
+        USER_PERM=${FILE_PERM:0:1}
+        GROUP_PERM=${FILE_PERM:1:1}
+        OTHER_PERM=${FILE_PERM:2:1}
+
+        # 판단 로직: 소유자가 root(UID 0)가 아니거나 권한이 644(rw-r--r--)보다 큰 경우
+        if [ "$FILE_OWNER_UID" -ne 0 ]; then
+            VULN_FOUND=1
+            DETAILS="소유자(owner)가 root가 아님 (현재: $FILE_OWNER_NAME)"
+        elif [ "$USER_PERM" -gt 6 ] || [ "$GROUP_PERM" -gt 4 ] || [ "$OTHER_PERM" -gt 4 ]; then
+            VULN_FOUND=1
+            DETAILS="권한이 644보다 큼 (현재: $FILE_PERM)"
+        fi
+    else
+        echo "※ U-19 결과 : N/A (파일이 존재하지 않음)" >> "$resultfile" 2>&1
+        return 0
+    fi
+
+    # 최종 결과 출력
+    if [ "$VULN_FOUND" -eq 1 ]; then
+        echo "※ U-19 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " [현황] $DETAILS" >> "$resultfile" 2>&1
+    else
+        echo "※ U-19 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    fi
+
+    return 0
+}
 
 U_20() {
     echo "" >> "$resultfile" 2>&1
@@ -1293,53 +1468,56 @@ U_23() {
 }
 
 
-
+#연진
 U_24() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-24(상) | 2. 파일 및 디렉토리 관리 > 2.11 사용자, 시스템 시작파일 및 환경파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : 홈 디렉터리 환경변수 파일 소유자가 root 또는 해당 계정이고, 쓰기 권한이 통제된 경우" >> "$resultfile" 2>&1
-
+  
     VULN=0
     REASON=""
-
+  
+    # 1. OS별 주요 점검 파일 지정
+    # Rocky: .bash_profile 중심 / Ubuntu: .profile 중심
     CHECK_FILES=(".profile" ".cshrc" ".login" ".kshrc" ".bash_profile" ".bashrc" ".bash_login" ".bash_logout" ".exrc" ".vimrc" ".netrc" ".forward" ".rhosts" ".shosts")
-
-    USER_LIST=$(awk -F: '$7!~/nologin/ && $7!~/false/ {print $1":"$6}' /etc/passwd)
-
+  
+    # 2. 로그인 가능한 사용자 추출 (Ubuntu 24.04의 /usr/sbin/nologin 경로 고려)
+    USER_LIST=$(awk -F: '$7!~/(nologin|false)/ {print $1":"$6}' /etc/passwd)
+  
     for USER_INFO in $USER_LIST; do
         USER_NAME=$(echo "$USER_INFO" | cut -d: -f1)
         USER_HOME=$(echo "$USER_INFO" | cut -d: -f2)
-
+    
         if [ -d "$USER_HOME" ]; then
             for FILE in "${CHECK_FILES[@]}"; do
                 TARGET="$USER_HOME/$FILE"
-
+        
                 if [ -f "$TARGET" ]; then
-
-                    FILE_OWNER=$(ls -l "$TARGET" | awk '{print $3}')
-
+                    # 4. 파일 소유자 확인 (stat 명령어가 ls보다 결과값이 고정적임)
+                    FILE_OWNER=$(stat -c "%U" "$TARGET")
+                    
                     if [ "$FILE_OWNER" != "root" ] && [ "$FILE_OWNER" != "$USER_NAME" ]; then
                         VULN=1
-                        REASON="$REASON 파일 소유자 불일치: $TARGET (소유자: $FILE_OWNER) |"
+                        REASON="$REASON [소유자 불일치] $TARGET (소유자: $FILE_OWNER) |"
                     fi
-
-                    PERM=$(ls -l "$TARGET" | awk '{print $1}')
-
-                    GROUP_WRITE=${PERM:5:1}
-                    OTHER_WRITE=${PERM:8:1}
-
-                    if [ "$GROUP_WRITE" == "w" ] || [ "$OTHER_WRITE" == "w" ]; then
+          
+                    # 5. 파일 권한 확인 (8진수 권한 추출)
+                    PERM_OCT=$(stat -c "%a" "$TARGET") # 예: 644
+                    
+                    # 8진수 권한의 각 자리수 분리 (사용자/그룹/기타)
+                    # 그룹(2번째 자리) 또는 기타(3번째 자리)에 쓰기(2, 3, 6, 7) 권한이 있는지 확인
+                    if [[ "$PERM_OCT" =~ .[2367]. ]] || [[ "$PERM_OCT" =~ ..[2367] ]]; then
                         VULN=1
-                        REASON="$REASON 권한 취약: $TARGET (권한: $PERM - 쓰기 권한 존재) |"
+                        REASON="$REASON [권한 취약] $TARGET (권한: $PERM_OCT) |"
                     fi
                 fi
             done
         fi
     done
-
+  
     if [ $VULN -eq 1 ]; then
         echo "※ U-24 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-        echo " $REASON" >> "$resultfile" 2>&1
+        echo " [현황] $REASON" >> "$resultfile" 2>&1
     else
         echo "※ U-24 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
