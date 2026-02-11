@@ -2473,6 +2473,7 @@ U_38() {
   fi
   return 0
 }
+
 U_39() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-39(상) | 3. 서비스 관리 > 3.6 불필요한 NFS 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -2483,55 +2484,35 @@ U_39() {
 
   # 1) systemd 기반 서비스 활성 여부 확인
   if command -v systemctl >/dev/null 2>&1; then
-    local nfs_units=(
-      "nfs-server"
-      "nfs"
-      "nfs-mountd"
-      "rpcbind"
-      "rpc-statd"
-      "rpc-statd-notify"
-      "rpc-gssd"
-      "rpc-svcgssd"
-      "rpc-idmapd"
-      "nfs-idmapd"
-    )
+    # Rocky 9/10의 표준 NFS 관련 유닛 목록
+    local nfs_units=("nfs-server" "rpcbind" "nfs-mountd" "rpc-statd" "rpc-idmapd")
 
     for u in "${nfs_units[@]}"; do
-      # 등록된 유닛만 대상으로 체크
-      if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "${u}.service"; then
-        if systemctl is-active --quiet "${u}.service" 2>/dev/null; then
-          found=1
-          reason+="${u}.service active; "
-        fi
+      # 서비스가 활성화(active) 상태인지 직접 확인
+      if systemctl is-active --quiet "$u" 2>/dev/null; then
+        found=1
+        reason+="$u active; "
       fi
     done
+  fi
 
-    # nfs 관련 서비스 전체에서 active 항목이 있는지 보조 체크
-    if systemctl list-units --type=service 2>/dev/null | grep -Eiq 'nfs|rpcbind|statd|mountd|idmapd|gssd'; then
-      # 위에서 이미 잡았을 수 있으니, 근거가 비어있을 때만 보강
-      if [ -z "$reason" ]; then
-        found=1
-        reason="systemctl 목록에서 nfs/rpc 관련 서비스가 동작 중으로 보입니다."
-      fi
+  # 2) 프로세스 기반 보조 확인 (커널 스레드 포함)
+  # grep -w를 사용하여 단어 단위로 정확히 매칭 (오탐 방지)
+  if ps -ef | grep -v "grep" | grep -iwE "nfsd|mountd|rpcbind|statd|lockd|idmapd" >/dev/null 2>&1; then
+    if [ $found -eq 0 ]; then
+      found=1
+      reason="NFS 관련 커널 스레드 또는 프로세스 실행 중"
     fi
   fi
 
-  # 2) 프로세스 기반 보조 확인 (기존 U-24 스타일 유지)
-  if ps -ef 2>/dev/null | grep -iE 'nfs|rpc\.statd|statd|rpc\.lockd|lockd|rpcbind|mountd|idmapd|gssd' \
-    | grep -ivE 'grep|kblockd|rstatd' >/dev/null 2>&1; then
-    found=1
-    if [ -z "$reason" ]; then
-      reason="NFS 관련 데몬 프로세스가 실행 중입니다. (ps -ef 기준)"
-    fi
-  fi
-
+  # 최종 결과 판정
   if [ "$found" -eq 1 ]; then
     echo "※ U-39 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " 불필요한 NFS 서비스 관련 데몬이 실행 중입니다. ($reason)" >> "$resultfile" 2>&1
-    return 0
+    echo " 불필요한 NFS 관련 서비스가 구동 중입니다. ($reason)" >> "$resultfile" 2>&1
+  else
+    echo "※ U-39 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 
-  echo "※ U-39 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
 #수진

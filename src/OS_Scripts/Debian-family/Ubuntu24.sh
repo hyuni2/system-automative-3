@@ -2335,6 +2335,62 @@ U_38() {
   return 0
 }
 
+#연진
+U_39() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-39(상) | 3. 서비스 관리 > 3.6 불필요한 NFS 서비스 비활성화 (Ubuntu 24) ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 불필요한 NFS 서비스 관련 데몬이 비활성화 되어 있는 경우" >> "$resultfile" 2>&1
+
+  local found=0
+  local reason=""
+
+  # 1) systemd 기반 서비스 활성 여부 확인 (Ubuntu 특화 명칭)
+  if command -v systemctl >/dev/null 2>&1; then
+    # Ubuntu의 nfs-kernel-server 및 관련 서비스 유닛 목록
+    local nfs_units=(
+      "nfs-kernel-server"
+      "nfs-common"
+      "rpcbind"
+      "rpc-statd"
+    )
+
+    for u in "${nfs_units[@]}"; do
+      # 서비스가 실제로 구동 중(active)인지 확인
+      if systemctl is-active --quiet "$u" 2>/dev/null; then
+        found=1
+        reason+="$u active; "
+      fi
+    done
+  fi
+
+  # 2) 프로세스 및 포트 기반 보조 확인
+  # nfsd(커널 모듈) 및 관련 데몬 프로세스 확인
+  if ps -ef | grep -v "grep" | grep -iwE "nfsd|mountd|rpcbind|statd|lockd" >/dev/null 2>&1; then
+    if [ $found -eq 0 ]; then
+      found=1
+      reason="NFS 관련 프로세스(nfsd 등)가 실행 중입니다."
+    fi
+  fi
+
+  # 3) NFS 설정 파일 존재 여부 확인 (Ubuntu 전용 경로)
+  if [ -f "/etc/exports" ] && [ -s "/etc/exports" ]; then
+    # 주석을 제외한 설정 내용이 있는지 확인
+    if grep -vE '^#|^\s#' "/etc/exports" | grep -q "/"; then
+        reason+="/etc/exports 내 공유 설정 존재; "
+    fi
+  fi
+
+  # 최종 결과 판정
+  if [ "$found" -eq 1 ]; then
+    echo "※ U-39 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " [현황] $reason" >> "$resultfile" 2>&1
+  else
+    echo "※ U-39 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
+
+  return 0
+}
+
 U_40() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-40(상) | 3. 서비스 관리 > 3.7 NFS 접근 통제 ◀" >> "$resultfile" 2>&1
