@@ -71,7 +71,7 @@ U_01() {
 #태훈 (수정: 원본 통합용 포맷으로 재작성)
 U_02() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-02(상) | 1. 계정관리 > 1. 계정관리 > 비밀번호 관리정책 설정 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-02(상) | 1. 계정관리 > 1.2 비밀번호 관리정책 설정 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : PASS_MAX_DAYS 90일 이하, PASS_MIN_DAYS 1일 이상, 비밀번호 최소 길이 8자 이상, 복잡성(minclass 3 이상 또는 u/l/d/o credit 설정), 재사용 제한(remember 4 이상) 적용" >> "$resultfile" 2>&1
 
     local TARGET_PASS_MAX_DAYS=90
@@ -188,7 +188,7 @@ U_02() {
 #연수
 U_03() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-03(상) | UNIX > 1. 계정 관리| 계정 잠금 임계값 설정 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-03(상) | 1. 계정 관리 > 1.3 계정 잠금 임계값 설정 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 계정 잠금 임계값이 10회 이하의 값으로 설정되어 있는 경우"  >> "$resultfile" 2>&1
 
   local pam_files=(
@@ -272,6 +272,7 @@ U_03() {
   echo " 계정 잠금 임계값(deny)이 10회 이하로 확인되었습니다. (max deny=$max_deny)" >> "$resultfile" 2>&1
   return 0
 }
+
 #수진
 U_05() {
     echo "" >> $resultfile 2>&1
@@ -334,7 +335,7 @@ U_06(){
 #태훈
 U_07() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-07(하) | 1. 계정관리 > 7. 불필요한 계정 제거 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-07(하) | 1. 계정관리 > 1.7 불필요한 계정 제거 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : 불필요 계정이 삭제/잠금 또는 로그인 불가 쉘(/sbin/nologin,/bin/false 등)로 설정되어 있는 경우" >> "$resultfile" 2>&1
 
     local vuln=0
@@ -369,7 +370,7 @@ U_07() {
 #연수
 U_08() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-08(중) | UNIX > 1. 계정 관리 | 관리자 권한(그룹/ sudoers) 최소화 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-08(중) | 1. 계정 관리 > 1.8 관리자 권한(그룹/ sudoers) 최소화 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 관리자 권한(관리자 그룹 및 sudo 권한)에 불필요한 계정이 등록되어 있지 않은 경우" >> "$resultfile" 2>&1
 
   # Rocky 10.x는 wheel + sudoers 기반이 핵심.
@@ -526,6 +527,7 @@ U_08() {
   echo " 관리자 권한(관리자 그룹 및 sudo 권한)에서 불필요 계정이 확인되지 않았습니다." >> "$resultfile" 2>&1
   return 0
 }
+
 #수진
 U_10() {
     echo "" >> $resultfile 2>&1
@@ -591,7 +593,7 @@ U_11(){
 #태훈
 U_12() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-12(하) | 1. 계정관리 > 12. 세션 종료 시간 설정 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-12(하) | 1. 계정관리 > 1.12 세션 종료 시간 설정 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : 유휴 세션 종료(TMOUT 등) 값이 설정되어 있고(권고: 600초 이하) 시스템 전반에 적용되는 경우" >> "$resultfile" 2>&1
 
     local TARGET_TMOUT=600
@@ -650,7 +652,7 @@ U_12() {
 #연수
 U_13() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-13(중) | UNIX > 1. 계정관리 > 안전한 비밀번호 암호화 알고리즘 사용 (Rocky 10.x 기준) ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-13(중) | 1. 계정관리 > 1.13 안전한 비밀번호 암호화 알고리즘 사용 (Rocky 10.x 기준) ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 안전한 해시 알고리즘(yescrypt:$y$, SHA-512:$6$, SHA-256:$5$) 사용" >> "$resultfile" 2>&1
 
   local shadow="/etc/shadow"
@@ -824,7 +826,7 @@ U_16(){
 #태훈
 U_17() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-17(중) | 2. 파일 및 디렉터리 관리 > 17. 시스템 시작 스크립트 권한 설정 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-17(중) | 2. 파일 및 디렉터리 관리 > 2.4 시스템 시작 스크립트 권한 설정 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : 시스템 시작 스크립트(초기화 스크립트/서비스 유닛)의 소유자 및 권한이 적절하고, 일반 사용자가 변경할 수 없는 경우" >> "$resultfile" 2>&1
 
     local vuln=0
@@ -894,7 +896,7 @@ U_17() {
 #연수
 U_18() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-18(상) | UNIX > 2. 파일 및 디렉토리 관리| /etc/shadow 파일 소유자 및 권한 설정 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-18(상) | 2. 파일 및 디렉토리 관리 > 2.5 /etc/shadow 파일 소유자 및 권한 설정 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /etc/shadow 파일의 소유자가 root이고, 권한이 400인 경우"  >> "$resultfile" 2>&1
 
   local target="/etc/shadow"
@@ -966,6 +968,7 @@ U_18() {
   echo " $target 소유자(root) 및 권한(perm=$perm)이 기준(400)을 만족합니다." >> "$resultfile" 2>&1
   return 0
 }
+
 #수진
 U_20() {
     # ------------------------------------------------------------------------
@@ -1086,7 +1089,7 @@ U_21(){
 #태훈
 U_22() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-22(상) | 2. 파일 및 디렉터리 관리 > 22. /etc/services 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-22(상) | 2. 파일 및 디렉터리 관리 > 2.9 /etc/services 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : /etc/services 파일 소유자가 root이고, 일반 사용자가 수정할 수 없도록 권한이 설정된 경우" >> "$resultfile" 2>&1
 
     local vuln=0
@@ -1122,7 +1125,7 @@ U_22() {
 #연수
 U_23() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-23(상) | UNIX > 2. 파일 및 디렉토리 관리| SUID, SGID, Sticky bit 설정 파일 점검 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-23(상) | 2. 파일 및 디렉토리 관리 > 2.10 SUID, SGID, Sticky bit 설정 파일 점검 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 주요 실행파일의 권한에 SUID와 SGID에 대한 설정이 부여되어 있지 않은 경우"  >> "$resultfile" 2>&1
 
   # 점검 대상(가이드에서 지정한 주요 실행 파일)
@@ -1278,7 +1281,7 @@ U_25() {
 #희윤
 U_26(){
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-26(상) | 2. 파일 및 디렉토리 관리 > /dev에 존재하지 않는 device 파일 점검 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-26(상) | 2. 파일 및 디렉토리 관리 > 2.13 /dev에 존재하지 않는 device 파일 점검 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /dev 디렉터리에 대한 파일 점검 후 존재하지 않는 device 파일을 제거한 경우" >> "$resultfile" 2>&1
 
   local target_dir="/dev"
@@ -1314,7 +1317,7 @@ U_26(){
 #태훈
 U_27() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-27(상) | 2. 파일 및 디렉터리 관리 > $HOME/.rhosts, hosts.equiv 사용 금지 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-27(상) | 2. 파일 및 디렉터리 관리 > 2.14 $HOME/.rhosts, hosts.equiv 사용 금지 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : .rhosts 및 /etc/hosts.equiv 파일이 존재하지 않거나 사용되지 않는 경우" >> "$resultfile" 2>&1
 
     local vuln=0
@@ -1360,7 +1363,7 @@ U_27() {
 #연수
 U_28() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-28(상) | UNIX > 2. 파일 및 디렉토리 관리 > 접속 IP 및 포트 제한 (Rocky 10.x 기준) ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-28(상) | 2. 파일 및 디렉토리 관리 > 2.15 접속 IP 및 포트 제한 (Rocky 10.x 기준) ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : (1) SSH 데몬/방화벽에서 특정 IP/대역만 허용하는 제한 정책이 존재하는 경우" >> "$resultfile" 2>&1
 
   local sshd_cfg="/etc/ssh/sshd_config"
@@ -1775,7 +1778,7 @@ U_31() {
 #태훈
 U_32() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-32(하) | 2. 파일 및 디렉터리 관리 > 32. 홈 디렉터리로 지정한 디렉터리의 존재 관리 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-32(하) | 2. 파일 및 디렉터리 관리 > 2.19 홈 디렉터리로 지정한 디렉터리의 존재 관리 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : 로그인 가능한 계정의 홈 디렉터리가 존재하며, 부적절한 홈 디렉터리 지정이 없는 경우" >> "$resultfile" 2>&1
 
     local vuln=0
@@ -1819,7 +1822,7 @@ U_32() {
 #연수
 U_33() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-33(하) | UNIX > 2. 파일 및 디렉토리 관리 > 숨겨진 파일 및 디렉토리 검색 및 제거 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-33(하) | 2. 파일 및 디렉토리 관리 > 2.20 숨겨진 파일 및 디렉토리 검색 및 제거 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 불필요하거나 의심스러운 숨겨진 파일 및 디렉터리를 삭제한 경우" >> "$resultfile" 2>&1
 
   ########################################################
@@ -2154,7 +2157,7 @@ U_36(){
 #태훈
 U_37() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-37(상) | 2. 파일 및 디렉터리 관리 > 37. crontab 설정 파일 권한 설정 미흡 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-37(상) | 3. 서비스 관리 > 3.4 crontab 설정 파일 권한 설정 미흡 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : cron 관련 설정 파일/디렉터리의 소유자 및 권한이 적절하며, 일반 사용자가 임의 변경할 수 없는 경우" >> "$resultfile" 2>&1
 
     local vuln=0
@@ -2246,7 +2249,7 @@ U_37() {
 #연수
 U_38() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-38(상) | UNIX > 3. 서비스 관리 | DoS 공격에 취약한 서비스 비활성화 (Rocky 10.x 기준) ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-38(상) | 3. 서비스 관리 | 3.5 DoS 공격에 취약한 서비스 비활성화 (Rocky 10.x 기준) ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : (1) 대상 서비스를 사용하지 않는 경우 N/A, (2) 대상 서비스가 비활성화된 경우" >> "$resultfile" 2>&1
 
   # Rocky 10.x 기본: inetd/xinetd 거의 미사용, systemd socket도 기본 제공 적음.
@@ -2483,7 +2486,7 @@ U_41(){
 #태훈
 U_42() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-42(상) | 3. 서비스 관리 > 42. 불필요한 RPC 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-42(상) | 3. 서비스 관리 > 3.9 불필요한 RPC 서비스 비활성화 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : RPC 서비스(rpcbind 등)가 불필요하게 활성화되어 있지 않은 경우" >> "$resultfile" 2>&1
 
     local vuln=0
@@ -2529,7 +2532,7 @@ U_42() {
 #연수
 U_43() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-43(상) | UNIX > 3. 서비스 관리 > NIS, NIS+ 점검 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-43(상) | 3. 서비스 관리 > 3.10 NIS, NIS+ 점검 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : (1) NIS 서비스를 사용하지 않는 경우 N/A, (2) 사용 시 NIS 서비스 비활성화 또는 불가피 시 NIS+ 사용" >> "$resultfile" 2>&1
 
   local mail_like_na=0   # N/A 여부 (여기서는 nis_in_use의 반대 개념)
@@ -2705,7 +2708,7 @@ U_46(){
 #태훈
 U_47() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-47(상) | 3. 서비스 관리 > 47. 스팸메일 릴레이 제한 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-47(상) | 3. 서비스 관리 > 3.14 스팸메일 릴레이 제한 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : 메일 서버가 오픈 릴레이(open relay)로 동작하지 않도록 릴레이 제한 설정이 적용된 경우" >> "$resultfile" 2>&1
 
     local vuln=0
@@ -2756,7 +2759,7 @@ U_47() {
 #연수
 U_48() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-48(중) | UNIX > 3. 서비스 관리 > expn, vrfy 명령어 제한 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-48(중) | 3. 서비스 관리 > 3.15 expn, vrfy 명령어 제한 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : (1) 메일 서비스를 사용하지 않는 경우 N/A, (2) 사용 시 noexpn, novrfy 옵션(또는 goaway)이 설정된 경우" >> "$resultfile" 2>&1
 
   local mail_in_use=0
@@ -2996,7 +2999,7 @@ U_51(){
 #태훈
 U_52() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-52(중) | 3. 서비스 관리 > Telnet 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-52(중) | 3. 서비스 관리 > 3.19 Telnet 서비스 비활성화 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : 원격 접속 시 Telnet 서비스(23/tcp)가 비활성화되어 있는 경우" >> "$resultfile" 2>&1
 
     local vuln=0
@@ -3062,7 +3065,7 @@ U_52() {
 #연수
 U_53() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-53(하) | UNIX > 3. 서비스 관리 > FTP 서비스 정보 노출 제한 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-53(하) | 3. 서비스 관리 > 3.20 FTP 서비스 정보 노출 제한 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : FTP 접속 배너에 노출되는 정보가 없는 경우" >> "$resultfile" 2>&1
 
   # 0) FTP(21/tcp) 리스닝 여부 확인
@@ -3267,7 +3270,7 @@ U_56(){
 #태훈
 U_57() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-57(상) | 3. 서비스 관리 > 57. ftpusers 파일 설정 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-57(상) | 3. 서비스 관리 > 3.24 ftpusers 파일 설정 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : FTP 사용 시 ftpusers(또는 동등 기능)로 접속 금지 사용자(특히 root)가 적절히 설정된 경우" >> "$resultfile" 2>&1
 
     local vuln=0
@@ -3338,7 +3341,7 @@ U_57() {
 #연수
 U_58() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-58(중) | UNIX > 3. 서비스 관리 > 불필요한 SNMP 서비스 구동 점검 (Rocky 10.x 기준) ◀" >> "$resultfile" 2>&1
+  echo "▶ U-58(중) | 3. 서비스 관리 > 3.25 불필요한 SNMP 서비스 구동 점검 (Rocky 10.x 기준) ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : SNMP 서비스를 사용하지 않는 경우" >> "$resultfile" 2>&1
 
   local found=0
@@ -3535,7 +3538,7 @@ U_61(){
 #태훈
 U_62() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-62(중) | 3. 서비스 관리 > 62. 로그인 시 경고 메시지 설정 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-62(중) | 3. 서비스 관리 > 3.29 로그인 시 경고 메시지 설정 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : 로그인 배너(/etc/issue, /etc/issue.net, SSH Banner 등)에 비인가 사용 금지 경고 메시지가 설정된 경우" >> "$resultfile" 2>&1
 
     local ok=0
@@ -3576,7 +3579,7 @@ U_62() {
 #연수
 U_63() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-63(중) | UNIX > 3. 서비스 관리 > sudo 명령어 접근 관리 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-63(중) | 3. 서비스 관리 > 3.30 sudo 명령어 접근 관리 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /etc/sudoers 파일 소유자가 root이고, 파일 권한이 640인 경우" >> "$resultfile" 2>&1
 
   # 1) /etc/sudoers 존재 여부
@@ -3917,7 +3920,7 @@ U_67() {
   _rc=$?
 
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-67(중) | 4. 로그 관리 > 로그 디렉터리 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-67(중) | 5. 로그 관리 > 5.3 로그 디렉터리 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /var/log 및 관련 로그 파일 소유자가 root이고 권한이 644 이하인 경우" >> "$resultfile" 2>&1
   local _status=""
   local _line=""
