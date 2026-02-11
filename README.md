@@ -68,7 +68,14 @@ Report/KISA_RESULT_*.txt (결과 저장)
 4. 결과는 `Report/` 폴더에 `KISA_RESULT_*.txt` 파일로 저장
 5. 대시보드 실행:
     ```bash
+    which python3 #설치확인
+    python3 --version
+    which pip3 #설치확인
+    python3 -m venv venv #가상환경 생성(안정화)
+    source venv/bin/activate #가상환경 활성화
+    pip install -r requirements.txt #필요한 패키지를 정리한 파일. 이거 한번에 다운받을 수 있는 명령어.
     cd src/dashboard_0210
-    python3 app.py
+    streamlit run app.py
+    이메일 입력
     ```
 6. 웹 브라우저에서 `http://localhost:5000` 접속하여 대시보드 확인
