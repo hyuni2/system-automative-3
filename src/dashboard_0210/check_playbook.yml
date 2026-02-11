@@ -50,3 +50,13 @@
           진단 스크립트 실행 결과가 비어있습니다.
           {% endif %}
         dest: "{{ playbook_dir }}/reports/{{ inventory_hostname }}_result.txt"
+
+    - name: Cleanup remote temporary files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/ubuntu_check.sh"
+        - "/tmp/rocky_check_9.sh"
+        - "/tmp/rocky_check_10.sh"
+      ignore_errors: yes
