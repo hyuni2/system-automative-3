@@ -1897,9 +1897,9 @@ U_32() {
   done < /etc/passwd
 
   if [[ "${#bad[@]}" -eq 0 ]]; then
-    echo "※ U-32 결과 : 양호" >> "$resultfile" 2>&1
+    echo "※ U-32 결과 : 양호(Good)" >> "$resultfile" 2>&1
   else
-    echo "※ U-32 결과 : 취약" >> "$resultfile" 2>&1
+    echo "※ U-32 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
     echo " 취약 항목 수: ${#bad[@]}" >> "$resultfile" 2>&1
     local i limit=30
     for i in "${!bad[@]}"; do
