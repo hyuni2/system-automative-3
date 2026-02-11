@@ -591,16 +591,27 @@ U_09() {
 
 #수진
 U_10() {
-    echo "" >> $resultfile 2>&1
-    echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀"  >> $resultfile 2>&1
-    echo " 양호 판단 기준 : 동일한 UID로 설정된 사용자 계정이 존재하지 않는 경우" >> $resultfile 2>&1
+    echo "" >> "$resultfile" 2>&1
+    echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀" >> "$resultfile" 2>&1
+    echo " 양호 판단 기준 : 동일한 UID로 설정된 사용자 계정이 존재하지 않는 경우" >> "$resultfile" 2>&1
+
+    vuln_flag=0
+
     if [ -f /etc/passwd ]; then
-        if [ `awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l` -gt 0 ]; then
-            echo "※ U-10 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-            echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> $resultfile 2>&1
+        dup_uid_count=$(awk -F: '{print $3}' /etc/passwd | sort | uniq -d | wc -l)
+
+        if [ "$dup_uid_count" -gt 0 ]; then
+            echo "※ U-10 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+            echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> "$resultfile" 2>&1
+            vuln_flag=1
         fi
+    else
+        echo "※ /etc/passwd 파일이 존재하지 않습니다." >> "$resultfile" 2>&1
+        vuln_flag=1
     fi
-    echo "※ U-10 결과 : 양호(Good)" >> $resultfile 2>&1
+    if [ "$vuln_flag" -eq 0 ]; then
+        echo "※ U-10 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    fi
 }
 
 #희윤
@@ -827,7 +838,6 @@ U_13() {
   echo " 점검계정 수: $checked, 샘플 근거: $evidence_good_sample" >> "$resultfile" 2>&1
   return 0
 }
-
 
 #연진
 U_14() {
@@ -1092,7 +1102,6 @@ U_18() {
   echo " $target 소유자(root) 및 권한(perm=$perm)이 기준(400)을 만족합니다." >> "$resultfile" 2>&1
   return 0
 }
-
 
 #연진
 U_19() {
@@ -1730,174 +1739,37 @@ U_29() {
 
 #수진
 U_30() {
-    echo "" >> $resultfile 2>&1
-    echo "▶ U-30(중) | 2. 파일 및 디렉토리 관리 > 2.17 UMASK 설정 관리 ◀"  >> $resultfile 2>&1
-    echo " 양호 판단 기준 : UMASK 값이 022 이상으로 설정된 경우" >> $resultfile 2>&1
-    umaks_value=`umask`
+    echo "" >> "$resultfile" 2>&1
+    echo "▶ U-30(중) | 2. 파일 및 디렉토리 관리 > 2.17 UMASK 설정 관리 ◀" >> "$resultfile" 2>&1
+    echo " 양호 판단 기준 : UMASK 값이 022 이상으로 설정된 경우" >> "$resultfile" 2>&1
+    vuln_flag=0
+    # systemd UMask 점검
+    for svc in $(systemctl list-unit-files --type=service --no-legend | awk '{print $1}'); do
+        umask_val=$(systemctl show "$svc" -p UMask 2>/dev/null | awk -F= '{print $2}')
+        [ -z "$umask_val" ] && continue
 
-    # 현재 세션 umask 설정 점검
-    if [ ${umaks_value:2:1} -lt 2 ]; then
-        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-        echo " 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-    elif [ ${umaks_value:3:1} -lt 2 ]; then
-        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-        echo " 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-    fi
-
-    # /etc/profile 파일 내 umask 설정 점검
-    if [ ${umaks_value:2:1} -lt 2 ]; then
-        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-        echo " 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-    elif [ ${umaks_value:3:1} -lt 2 ]; then
-        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-        echo " 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-    fi
-    # /etc/profile 파일 내 umask 설정 점검
-    # 변수로 선언한 umask, 즉 umask=값 형태는 무시
-    if [ -f /etc/profile ]; then
-        mapfile -t umaks_value < <(
-            grep -vE '^[[:space:]]*#' /etc/profile \
-            | grep -i 'umask' \
-            | grep -vE 'if|=' \
-            | awk '{print $2}'
-        )
-        for ((i=0; i<${#umaks_value[@]}; i++))
-        do
-            if [ ${#umaks_value[$i]} -eq 2 ]; then
-                if [ ${umaks_value[$i]:0:1} -lt 2 ]; then
-                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                    echo " /etc/profile 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                elif [ ${umaks_value[$i]:1:1} -lt 2 ]; then
-                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                    echo " /etc/profile 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                fi
-            elif [ ${#umaks_value[$i]} -eq 4 ]; then
-                if [ ${umaks_value[$i]:2:1} -lt 2 ]; then
-                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                    echo " /etc/profile 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                elif [ ${umaks_value[$i]:3:1} -lt 2 ]; then
-                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                    echo " /etc/profile 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                fi
-            elif [ ${#umaks_value[$i]} -eq 3 ]; then
-                if [ ${umaks_value[$i]:1:1} -lt 2 ]; then
-                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                    echo " /etc/profile 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                elif [ ${umaks_value[$i]:2:1} -lt 2 ]; then
-                    echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                    echo " /etc/profile 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                fi
-            elif [ ${#umaks_value[$i]} -eq 1 ]; then
-                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                echo " /etc/profile 파일에 umask 값이 0022 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-            else
-                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                echo " /etc/profile 파일에 설정된 umask 값이 보안 설정에 부합하지 않습니다." >> $resultfile 2>&1
-            fi
-        done
-    fi
-
-    # /etc/bashrc, /etc/csh.login, /etc/csh.cshrc 파일 내 umask 설정 확인
-    umask_settings_files=("/etc/bashrc" "/etc/csh.login" "/etc/csh.cshrc")
-    for ((i=0; i<${#umask_settings_files[@]}; i++))
-    do
-        if [ -f ${umask_settings_files[$i]} ]; then
-            file_umask_count=`grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l`
-            if [ $file_umask_count -gt 0 ]; then
-                umaks_value=(`grep -vE '^#|^\s#' ${umask_settings_files[$i]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'`)
-                for ((j=0; j<${#umaks_value[@]}; j++))
-                do
-                    if [ ${#umaks_value[$j]} -eq 2 ]; then
-                        if [ ${umaks_value[$j]:0:1} -lt 2 ]; then
-                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                            echo " ${umask_settings_files[$i]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                        elif [ ${umaks_value[$j]:1:1} -lt 2 ]; then
-                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                            echo " ${umask_settings_files[$i]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                        fi
-                    elif [ ${#umaks_value[$j]} -eq 4 ]; then
-                        if [ ${umaks_value[$j]:2:1} -lt 2 ]; then
-                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                            echo " ${umask_settings_files[$i]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                        elif [ ${umaks_value[$j]:3:1} -lt 2 ]; then
-                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                            echo " ${umask_settings_files[$i]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                        fi
-                    elif [ ${#umaks_value[$j]} -eq 3 ]; then
-                        if [ ${umaks_value[$j]:1:1} -lt 2 ]; then
-                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                            echo " ${umask_settings_files[$i]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                        elif [ ${umaks_value[$j]:2:1} -lt 2 ]; then
-                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                            echo " ${umask_settings_files[$i]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                        fi
-                    elif [ ${#umaks_value[$j]} -eq 1 ]; then
-                        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                        echo " ${umask_settings_files[$i]} 파일에 umask 값이 0022 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                    else
-                        echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                        echo " ${umask_settings_files[$i]} 파일에 설정된 umask 값이 보안 설정에 부합하지 않습니다." >> $resultfile 2>&1
-                    fi
-                done
-            fi
+        umask_dec=$((8#$umask_val))
+        if [ "$umask_dec" -lt 18 ]; then
+            vuln_flag=1
+            break
         fi
     done
-
-    # 사용자 홈 디렉터리 설정 파일에서 umask 설정 확인
-    user_homedirectory_path=(`awk -F : '$7!="/bin/false" && $7!="/sbin/nologin" && $6!=null {print $6}' /etc/passwd | uniq`)
-    user_homedirectory_path2=(/home/*)
-    for ((i=0; i<${#user_homedirectory_path2[@]}; i++))
-    do
-        user_homedirectory_path[${#user_homedirectory_path[@]}]=${user_homedirectory_path2[$i]}
-    done
-    umask_settings_files=(".cshrc" ".profile" ".login" ".bashrc" ".kshrc")
-    for ((i=0; i<${#user_homedirectory_path[@]}; i++))
-    do
-        for ((j=0; j<${#umask_settings_files[@]}; j++))
-        do
-            if [ -f ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} ]; then
-                user_homedirectory_setting_umask_count=`grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}' | wc -l`
-                if [ $user_homedirectory_setting_umask_count -gt 0 ]; then
-                    umaks_value=(`grep -vE '^#|^\s#' ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} | grep -i 'umask' | grep -vE 'if|\`' | awk '{print $2}'`)
-                    for ((k=0; k<${#umaks_value[@]}; k++))
-                    do
-                        if [ ${#umaks_value[$k]} -eq 2 ]; then
-                            if [ ${umaks_value[$k]:0:1} -lt 2 ]; then
-                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                            elif [ ${umaks_value[$k]:1:1} -lt 2 ]; then
-                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                            fi
-                        elif [ ${#umaks_value[$k]} -eq 4 ]; then
-                            if [ ${umaks_value[$k]:2:1} -lt 2 ]; then
-                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                            elif [ ${umaks_value[$k]:3:1} -lt 2 ]; then
-                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                            fi
-                        elif [ ${#umaks_value[$k]} -eq 3 ]; then
-                            if [ ${umaks_value[$k]:1:1} -lt 2 ]; then
-                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 그룹 사용자(group)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                            elif [ ${umaks_value[$k]:2:1} -lt 2 ]; then
-                                echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                                echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 다른 사용자(other)에 대한 umask 값이 2 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                            fi
-                        elif [ ${#umaks_value[$k]} -eq 1 ]; then
-                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                            echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 umask 값이 0022 이상으로 설정되지 않았습니다." >> $resultfile 2>&1
-                        else
-                            echo "※ U-30 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-                            echo " ${user_homedirectory_path[$i]}/${umask_settings_files[$j]} 파일에 설정된 umask 값이 보안 설정에 부합하지 않습니다." >> $resultfile 2>&1
-                        fi
-                    done
-                fi
+    # login.defs, PAM 점검
+    if [ "$vuln_flag" -eq 0 ]; then
+        if grep -q "pam_umask.so" /etc/pam.d/common-session 2>/dev/null; then
+            login_umask=$(grep -E "^UMASK" /etc/login.defs 2>/dev/null | awk '{print $2}')
+            if [ -z "$login_umask" ] || [ $((8#$login_umask)) -lt 18 ]; then
+                vuln_flag=1
             fi
-        done
-    done
-    echo "※ U-30 결과 : 양호(Good)" >> $resultfile 2>&1
+        else
+            vuln_flag=1
+        fi
+    fi
+    if [ "$vuln_flag" -eq 1 ]; then
+        echo "※ U-30 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    else
+        echo "※ U-30 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    fi
 }
 
 #희윤
