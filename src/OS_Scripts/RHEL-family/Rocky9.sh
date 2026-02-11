@@ -478,13 +478,14 @@ U_03() {
   echo "※ U-03 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
+#연진
 U_04() {
 	echo ""  >> $resultfile 2>&1
 	echo "▶ U-04(상) | 1. 계정관리 > 1.4 패스워드 파일 보호 ◀"  >> $resultfile 2>&1
 	echo " 양호 판단 기준 : shadow 패스워드를 사용하거나, 패스워드를 암호화하여 저장하는 경우"  >> $resultfile 2>&1
 
     VULN_COUNT=$(awk -F : '$2 != "x" && $2 != "!!" && $2 != "*"' /etc/passwd | wc -l)
-    if [ $VULN_COUNT -gt 0 ]; then
+    if [ "$VULN_COUNT" -gt 0 ]; then
         VULN_USERS=$(awk -F : '$2 != "x" && $2 != "!!" && $2 != "*"' /etc/passwd | cut -d: -f1)
         echo "※ U-04 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
         echo " /etc/passwd 파일에 shadow 패스워드를 사용하지 않는 계정이 존재: $VULN_USERS" >> "$resultfile" 2>&1
@@ -502,7 +503,7 @@ U_05() {
     echo "▶ U-05(상) | 1. 계정관리 > 1.5 root 이외의 UID가 '0' 금지 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : root 계정과 동일한 UID를 갖는 계정이 존재하지 않는 경우" >> $resultfile 2>&1
     if [ -f /etc/passwd ]; then
-        if [ `awk -F : '$3==0 {print $1}' /etc/passwd | grep -vx 'root' | wc -l` -gt 0 ]; then
+        if [ "$(awk -F : '$3==0 {print $1}' /etc/passwd | grep -vx 'root' | wc -l)" -gt 0 ]; then
             echo "※ U-44 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
             echo " root 계정과 동일한 UID(0)를 갖는 계정이 존재합니다." >> $resultfile 2>&1
         else
@@ -912,6 +913,8 @@ U_08() {
   echo "※ U-08 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
+
+#연진
 U_09() {
 	echo ""  >> $resultfile 2>&1
 	echo "▶ U-09(하) | 1. 계정관리 > 1.12 계정이 존재하지 않는 GID 금지 ◀"  >> $resultfile 2>&1
@@ -940,12 +943,12 @@ U_10() {
     echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : 동일한 UID로 설정된 사용자 계정이 존재하지 않는 경우" >> $resultfile 2>&1
     if [ -f /etc/passwd ]; then
-        if [ `awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l` -gt 0 ]; then
-            echo "※ U-10 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-            echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> $resultfile 2>&1
+        if [ "$(awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l)" -gt 0 ]; then
+            echo "※ U-10 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+            echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> "$resultfile" 2>&1
         fi
     fi
-    echo "※ U-10 결과 : 양호(Good)" >> $resultfile 2>&1
+    echo "※ U-10 결과 : 양호(Good)" >> "$resultfile" 2>&1
 }
 U_11(){
     echo "" >> $resultfile 2>&1
@@ -1345,6 +1348,7 @@ U_13() {
   echo "※ U-13 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
+#연진
 U_14() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-14(상) | 2. 파일 및 디렉토리 관리 > 2.1 root 홈, 패스 디렉터리 권한 및 패스 설정 ◀" >> "$resultfile" 2>&1
@@ -1667,6 +1671,7 @@ U_18() {
   echo "※ U-18 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
+#연진
 U_19() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-19(상) | 2. 파일 및 디렉토리 관리 > 2.6 /etc/hosts 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
@@ -1988,6 +1993,7 @@ U_23() {
   echo " 점검 대상 주요 실행 파일에서 SUID/SGID 설정이 확인되지 않았습니다." >> "$resultfile" 2>&1
   return 0
 }
+#연진
 U_24() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-24(상) | 2. 파일 및 디렉토리 관리 > 2.11 사용자, 시스템 시작파일 및 환경파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
@@ -2042,7 +2048,7 @@ U_25() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-25(상) | 2. 파일 및 디렉토리 관리 > 2.12 world writable 파일 점검 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : world writable 파일이 존재하지 않거나, 존재 시 설정 이유를 인지하고 있는 경우"  >> $resultfile 2>&1
-    if [ `find / -type f -perm -2 2>/dev/null | wc -l` -gt 0 ]; then
+    if [ "$(find / -type f -perm -2 2>/dev/null | wc -l)" -gt 0 ]; then
         echo "※ U-25 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
         echo " world writable 설정이 되어있는 파일이 있습니다." >> $resultfile 2>&1
     else
@@ -2413,6 +2419,7 @@ U_28() {
   echo " 기본 차단 정책(ALL:ALL)이 적용되어 있으며 전체 허용 설정이 없습니다." >> "$resultfile" 2>&1
   return 0
 }
+#연진
 U_29() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-29(하) | 2. 파일 및 디렉토리 관리 > 2.16 hosts.lpd 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
@@ -2819,6 +2826,7 @@ U_33() {
 
   return 0
 }
+#연진
 U_34() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-34(상) | 3. 서비스 관리 > 3.1 Finger 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -3552,6 +3560,7 @@ U_38() {
 
   return 0
 }
+#연진
 U_39() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-39(상) |3. 서비스 관리 > 불필요한 NFS 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -3821,6 +3830,7 @@ U_43() {
   fi
   return 0
 }
+#연진
 U_44() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-44(상) | UNIX > 3. 서비스 관리 > tftp, talk 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -3876,7 +3886,7 @@ U_44() {
   echo " tftp/talk/ntalk 서비스가 systemd/xinetd/inetd 설정에서 모두 비활성 상태입니다." >> "$resultfile" 2>&1
   return 0
 }
-
+#연진
 U_49() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-49(상) |3. 서비스 관리 > DNS 보안 버전 패치 ◀" >> "$resultfile" 2>&1
@@ -4895,6 +4905,7 @@ U_53() {
 
   return 0
 }
+#연진
 U_54() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-54(중) |3. 서비스 관리 > 암호화되지 않는 FTP 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -5537,6 +5548,7 @@ U_58() {
 
   return 0
 }
+#연진
 U_59() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-59(상) |3. 서비스 관리 > 안전한 SNMP 버전 사용 ◀" >> "$resultfile" 2>&1
@@ -6278,6 +6290,7 @@ U_63() {
 
   return 0
 }
+#연진
 U_64() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-64(상) |4. 패치 관리 > 주기적 보안 패치 및 벤더 권고사항 적용 ◀" >> "$resultfile" 2>&1

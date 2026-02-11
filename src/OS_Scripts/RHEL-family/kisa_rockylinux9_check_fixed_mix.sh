@@ -414,6 +414,77 @@ U_11(){
         echo "※ U-11 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
+
+# Main execution - call all check functions
+main() {
+    U_01
+    U_02
+    U_03
+    U_04
+    U_05
+    U_06
+    U_08
+    U_09
+    U_10
+    U_11
+    U_12
+    U_13
+    U_14
+    U_15
+    U_16
+    U_17
+    U_18
+    U_19
+    U_20
+    U_21
+    U_23
+    U_24
+    U_25
+    U_26
+    U_28
+    U_29
+    U_30
+    U_31
+    U_32
+    U_33
+    U_34
+    U_35
+    U_36
+    U_38
+    U_39
+    U_40
+    U_41
+    U_43
+    U_44
+    U_45
+    U_46
+    U_48
+    U_49
+    U_50
+    U_51
+    U_53
+    U_54
+    U_55
+    U_56
+    U_58
+    U_59
+    U_60
+    U_61
+    U_63
+    U_64
+    U_65
+    U_66
+    U_27
+    U_37
+    U_42
+    U_47
+    U_52
+    U_07
+}
+
+# Execute main function
+main
+
 #연수
 U_13() {
   echo ""  >> "$resultfile" 2>&1

@@ -1724,6 +1724,7 @@ U_28() {
   return 0
 }
 
+#연진
 U_29() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-29(하) | 2. 파일 및 디렉토리 관리 > 2.16 hosts.lpd 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
@@ -1948,6 +1949,7 @@ U_33() {
   return 0
 }
 
+#연진
 U_34() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-34(상) | 3. 서비스 관리 > 3.1 Finger 서비스 비활성화 ◀" >> "$resultfile" 2>&1
