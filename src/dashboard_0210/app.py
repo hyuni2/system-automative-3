@@ -431,19 +431,6 @@ with st.sidebar:
 
     st.session_state.page = page_map[selected]
 
-# [추가] 진단 결과 계속 안뜨게 하도록
-if st.session_state.page != "diagnosis":
-    # 화면 출력용 세션 값 초기화
-    st.session_state["latest_result_ip"] = None
-    
-    # 실제 reports 폴더 내의 결과 파일 삭제
-    REPORTS_DIR = Path(__file__).parent / "reports"
-    if REPORTS_DIR.exists():
-        for f in REPORTS_DIR.glob("*_result.txt"):
-            try:
-                f.unlink()
-            except Exception:
-                pass
 # =========================================================
 # MAIN / CHECK PAGE ROUTING
 # =========================================================
@@ -605,6 +592,7 @@ elif st.session_state.page == "check":
                             if line.startswith("{") and line.endswith("}"):
                                 data = json.loads(line)
                                 parsed_results.append({
+                                    "코드": data.get("code"),
                                     "항목": data.get("item"),
                                     "상태": data.get("status"),
                                     "상세 사유": data.get("reason"),
@@ -658,8 +646,6 @@ elif st.session_state.page == "check":
 
                 except Exception as e:
                     st.error(f"리포트 처리 중 오류 발생: {e}")
-
-
 
 # =========================================================
 # HISTORY PAGE
