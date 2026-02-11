@@ -838,82 +838,51 @@ if [[ "$_status" == "GOOD" ]]; then
 }
 
 U_08() {
-  echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-08(중) | 1. 계정 관리 > 1.8 관리자 그룹에 최소한의 계정 포함 ◀"  >> "$resultfile" 2>&1
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-08(중) | 1. 계정 관리 > 1.8 관리자 그룹에 최소한의 계정 포함 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 관리자 그룹에 불필요한 계정이 등록되어 있지 않은 경우" >> "$resultfile" 2>&1
 
   local admin_groups=("root" "wheel" "sudo" "admin")
-  local unnecessary_accounts=(
-    "daemon" "bin" "sys" "adm" "listen" "nobody" "nobody4" "noaccess" "diag"
-    "operator" "gopher" "games" "ftp" "apache" "httpd" "www-data"
-    "mysql" "mariadb" "postgres" "mail" "postfix" "news" "lp" "uucp" "nuucp"
-  )
+  local vuln_found=0
+  local found_group=0
+  local all_non_root_members=""
 
   if [ ! -f /etc/group ]; then
     echo "※ U-08 결과 : N/A" >> "$resultfile" 2>&1
-    echo " /etc/group 파일이 없습니다." >> "$resultfile" 2>&1
+    echo " /etc/group 파일이 존재하지 않습니다." >> "$resultfile" 2>&1
     return 0
   fi
 
-  _group_exists() { getent group "$1" >/dev/null 2>&1; }
-
-  _collect_group_users() {
-    local g="$1" users="" line members
-    line="$(getent group "$g" 2>/dev/null)"
-    members="$(echo "$line" | awk -F: '{print $4}')"
-    [ -n "$members" ] && users+="$members,"
-
-    if [ -f /etc/gshadow ]; then
-      local gsh admins gmembers
-      gsh="$(awk -F: -v gg="$g" '$1==gg{print $0}' /etc/gshadow 2>/dev/null)"
-      admins="$(echo "$gsh" | awk -F: '{print $3}')"
-      gmembers="$(echo "$gsh" | awk -F: '{print $4}')"
-      [ -n "$admins" ] && users+="$admins,"
-      [ -n "$gmembers" ] && users+="$gmembers,"
-    fi
-
-    echo "$users" | tr ',' '\n' | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]//g' | sort -u
-  }
-
-  _is_unnecessary() {
-    local u="$1" x
-    for x in "${unnecessary_accounts[@]}"; do
-      [ "$u" = "$x" ] && return 0
-    done
-    return 1
-  }
-
-  local any_admin_group_found=0 vuln_found=0
-
   for g in "${admin_groups[@]}"; do
-    if _group_exists "$g"; then
-      any_admin_group_found=1
-      local u bads=""
-      while IFS= read -r u; do
-        [ -z "$u" ] && continue
-        _is_unnecessary "$u" && bads+="$u "
-      done < <(_collect_group_users "$g")
+    group_line=$(getent group "$g" 2>/dev/null)
+    [ -z "$group_line" ] && continue
 
-      if [ -n "$bads" ]; then
+    found_group=1
+
+    members=$(echo "$group_line" | awk -F: '{print $4}' | tr ',' ' ')
+    
+    for user in $members; do
+      if [ -n "$user" ] && [ "$user" != "root" ]; then
         vuln_found=1
-        echo "※ 취약 징후: 관리자 그룹($g)에 불필요 계정 포함: $bads" >> "$resultfile" 2>&1
+        all_non_root_members+="$user "
       fi
-    fi
+    done
   done
 
-  if [ "$any_admin_group_found" -eq 0 ]; then
+  if [ "$found_group" -eq 0 ]; then
     echo "※ U-08 결과 : N/A" >> "$resultfile" 2>&1
-    echo " 점검할 관리자 그룹(root/wheel/sudo/admin)이 존재하지 않습니다." >> "$resultfile" 2>&1
+    echo " 점검 대상 관리자 그룹(root/wheel/sudo/admin)이 존재하지 않습니다." >> "$resultfile" 2>&1
     return 0
   fi
 
   if [ "$vuln_found" -eq 1 ]; then
     echo "※ U-08 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " 관리자 그룹에 불필요한 계정이 등록되어 있습니다. (위 근거 참고)" >> "$resultfile" 2>&1
-    return 0
+    echo " 관리자 그룹에 root 이외 계정이 포함되어 있습니다 : $all_non_root_members" >> "$resultfile" 2>&1
+    echo " 회사 내부 정책에 따라 관리자 그룹 구성원을 점검하시기 바랍니다." >> "$resultfile" 2>&1
+  else
+    echo "※ U-08 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 
-  echo "※ U-08 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
 
@@ -1369,50 +1338,24 @@ U_13() {
 U_14() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-14(상) | 2. 파일 및 디렉토리 관리 > 2.1 root 홈, 패스 디렉터리 권한 및 패스 설정 ◀" >> "$resultfile" 2>&1
-    echo " 양호 판단 기준 : PATH 환경변수에 \".\" 이 맨 앞이나 중간에 포함되지 않은 경우" >> "$resultfile" 2>&1
+    echo " 양호 판단 기준 : root 계정 PATH 환경변수에 '.' 이 맨 앞이나 중간에 포함되지 않은 경우" >> "$resultfile" 2>&1
 
     VULN_FOUND=0
     DETAILS=""
 
-    if echo "$PATH" | grep -qE '^\.:|:.:|^:|::'; then
+    # root 로그인 쉘 기준 PATH 추출
+    ROOT_PATH=$(su - root -c 'echo $PATH' 2>/dev/null)
+
+    if [ -z "$ROOT_PATH" ]; then
+        echo "※ U-14 결과 : N/A" >> "$resultfile" 2>&1
+        echo " root 계정 PATH를 확인할 수 없습니다." >> "$resultfile" 2>&1
+        return 0
+    fi
+
+    # 취약 패턴 검사
+    if echo "$ROOT_PATH" | grep -qE '(^|:)\.(/|:|$)|::|^:|:$'; then
         VULN_FOUND=1
-        DETAILS="[Runtime] 현재 PATH 환경변수 내 우선순위 높은 '.' 또는 '::' 발견: $PATH"
-    fi
-
-    if [ $VULN_FOUND -eq 0 ]; then
-        path_settings_files=("/etc/profile" "/etc/.login" "/etc/csh.cshrc" "/etc/csh.login" "/etc/environment" "/etc/bashrc" "/etc/bash.bashrc")
-
-        for file in "${path_settings_files[@]}"; do
-            if [ -f "$file" ]; then
-                VULN_LINE=$(grep -vE '^#|^\s#' "$file" | grep 'PATH=' | grep -E '=\.:|=\.|:\.:|::|:$')
-                if [ ! -z "$VULN_LINE" ]; then #취약한 path 설정 발견시
-                    VULN_FOUND=1
-                    DETAILS="[System File] $file: $VULN_LINE" #어떤 파일, 어떤 라인인지 기록
-                    break
-                fi
-            fi
-        done
-    fi
-
-    if [ $VULN_FOUND -eq 0 ]; then
-        user_dot_files=(".profile" ".cshrc" ".login" ".kshrc" ".bash_profile" ".bashrc" ".bash_login")
-        user_homedirs=$(awk -F: '$7!="/bin/false" && $7!="/sbin/nologin" {print $6}' /etc/passwd | sort | uniq)
-
-        for dir in $user_homedirs; do
-            for dotfile in "${user_dot_files[@]}"; do
-                target="$dir/$dotfile" #실제 검사할 파일 경로 생성
-                if [ -f "$target" ]; then #일반파일이 존재하면 true
-                    VULN_LINE=$(grep -vE '^#|^\s#' "$target" \
-                                | grep 'PATH=' \
-                                | grep -E '=\.:|=\.|:\.:|::|:$')
-                    if [ ! -z "$VULN_LINE" ]; then
-                        VULN_FOUND=1
-                        DETAILS="[User File] $target: $VULN_LINE"
-                        break 2
-                    fi
-                fi
-            done
-        done
+        DETAILS="root PATH 환경변수 내 취약 경로 포함: $ROOT_PATH"
     fi
 
     if [ $VULN_FOUND -eq 1 ]; then
@@ -1942,80 +1885,134 @@ if [[ "$_status" == "GOOD" ]]; then
 U_23() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-23(상) | 2. 파일 및 디렉토리 관리 > 2.10 SUID, SGID, Sticky bit 설정 파일 점검 ◀"  >> "$resultfile" 2>&1
-  echo " 양호 판단 기준 : 주요 실행파일의 권한에 SUID와 SGID에 대한 설정이 부여되어 있지 않은 경우"  >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 불필요하거나 비정상 경로에 SUID/SGID 설정 파일이 존재하지 않는 경우" >> "$resultfile" 2>&1
+  echo " 취약 판단 기준 : 사용자 쓰기 가능/비정상 경로(/tmp,/var/tmp,/home 등)에 SUID/SGID 파일 존재 또는 패키지 미소유 SUID/SGID 파일 존재" >> "$resultfile" 2>&1
 
-  local executables=(
-    "/sbin/dump"
-    "/sbin/restore"
-    "/sbin/unix_chkpwd"
-    "/usr/bin/at"
-    "/usr/bin/lpq" "/usr/bin/lpq-lpd"
-    "/usr/bin/lpr" "/usr/bin/lpr-lpd"
-    "/usr/bin/lprm" "/usr/bin/lprm-lpd"
-    "/usr/bin/newgrp"
-    "/usr/sbin/lpc" "/usr/sbin/lpc-lpd"
-    "/usr/sbin/traceroute"
-  )
+  # --- 환경에 따라 조절 ---
+  local SEARCH_ROOT="/"
+  local MAX_EVIDENCE=30
 
+  # ✅ 배포판 기본으로 존재할 수 있는 허용(화이트리스트)
+  # (너 시스템 기준으로 확장 가능)
   local whitelist=(
-    "/sbin/unix_chkpwd"
-    "/usr/bin/newgrp"
     "/usr/bin/passwd"
     "/usr/bin/sudo"
-    "/usr/bin/chsh"
-    "/usr/bin/chfn"
+    "/usr/bin/su"
+    "/usr/bin/newgrp"
     "/usr/bin/gpasswd"
+    "/usr/bin/chfn"
+    "/usr/bin/chsh"
+    "/usr/bin/mount"
+    "/usr/bin/umount"
+    "/usr/bin/crontab"
+    "/usr/sbin/unix_chkpwd"
+    "/usr/sbin/pam_timestamp_check"
+    "/usr/libexec/utempter/utempter"
+    "/usr/sbin/mount.nfs"
   )
 
   _is_whitelisted() {
-    local file="$1"
+    local f="$1" w
     for w in "${whitelist[@]}"; do
-      if [ "$file" = "$w" ]; then
-        return 0
-      fi
+      [ "$f" = "$w" ] && return 0
     done
+    return 1
+  }
+
+  # 사용자 쓰기 가능 영역에 있으면 무조건 취약으로 보는 경로(강하게)
+  _is_bad_path() {
+    local f="$1"
+    case "$f" in
+      /tmp/*|/var/tmp/*|/dev/shm/*|/home/*|/run/user/*)
+        return 0 ;;
+    esac
     return 1
   }
 
   local vuln_found=0
   local warn_found=0
+  local evidence_vuln=""
+  local evidence_warn=""
+  local count_v=0
+  local count_w=0
 
-  for f in "${executables[@]}"; do
-    if [ -f "$f" ]; then
-      local oct_perm mode special
-      oct_perm="$(stat -c '%a' "$f" 2>/dev/null)"
-      mode="$(stat -c '%A' "$f" 2>/dev/null)"
-      [ -z "$oct_perm" ] && continue
+  # 1) 전체에서 SUID/SGID 파일 탐색 (가이드 실무형)
+  # - -xdev : 다른 파일시스템(/proc,/sys 등) 넘어가지 않음
+  # - -type f : 파일만
+  # - -perm -4000 : SUID
+  # - -perm -2000 : SGID
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
 
-      special="0"
-      if [ "${#oct_perm}" -eq 4 ]; then
-        special="${oct_perm:0:1}"
+    # 기본 정보
+    local mode owner group
+    mode="$(stat -c '%A' "$f" 2>/dev/null)"
+    owner="$(stat -c '%U' "$f" 2>/dev/null)"
+    group="$(stat -c '%G' "$f" 2>/dev/null)"
+    [ -z "$mode" ] && continue
+
+    # 1-A) 비정상/사용자 쓰기 가능 경로면 무조건 취약
+    if _is_bad_path "$f"; then
+      vuln_found=1
+      if (( count_v < MAX_EVIDENCE )); then
+        evidence_vuln+="  - $mode $owner:$group $f (BAD_PATH)\n"
+        count_v=$((count_v+1))
       fi
+      continue
+    fi
 
-      if [[ "$special" =~ [2467] ]] && [[ "$mode" =~ [sS] ]]; then
-        if _is_whitelisted "$f"; then
-          warn_found=1
-        else
-          vuln_found=1
+    # 1-B) 화이트리스트면 Warning(또는 양호 근거)
+    if _is_whitelisted "$f"; then
+      warn_found=1
+      if (( count_w < MAX_EVIDENCE )); then
+        evidence_warn+="  - $mode $owner:$group $f (WHITELIST)\n"
+        count_w=$((count_w+1))
+      fi
+      continue
+    fi
+
+    # 1-C) 패키지 소유 여부 확인 (미소유면 취약)
+    # rpm 기반(Rocky)에서 SUID/SGID가 패키지에 속하지 않으면 매우 의심
+    if command -v rpm >/dev/null 2>&1; then
+      if ! rpm -qf "$f" >/dev/null 2>&1; then
+        vuln_found=1
+        if (( count_v < MAX_EVIDENCE )); then
+          evidence_vuln+="  - $mode $owner:$group $f (NOT_OWNED_BY_RPM)\n"
+          count_v=$((count_v+1))
         fi
+        continue
       fi
     fi
-  done
 
-  if [ "$vuln_found" -eq 1 ]; then
+    # 1-D) 그 외는 “의심(Warning)”으로 분류 (환경 따라 취약으로 올려도 됨)
+    warn_found=1
+    if (( count_w < MAX_EVIDENCE )); then
+      evidence_warn+="  - $mode $owner:$group $f (CHECK)\n"
+      count_w=$((count_w+1))
+    fi
+
+  done < <(find "$SEARCH_ROOT" -xdev -type f \( -perm -4000 -o -perm -2000 \) 2>/dev/null)
+
+  # Sticky bit (/tmp,/var/tmp) 확인 (참고용)
+  local tmpperm vartmpperm
+  tmpperm="$(stat -c '%A' /tmp 2>/dev/null)"
+  vartmpperm="$(stat -c '%A' /var/tmp 2>/dev/null)"
+
+  # 2) 결과 출력
+  if (( vuln_found == 1 )); then
     echo "※ U-23 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " whitelist(예외) 외 주요 실행 파일에서 SUID/SGID 설정이 확인되었습니다. (위 근거 참고)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  if [ "$warn_found" -eq 1 ]; then
+    echo " [근거] 비정상/사용자쓰기가능 경로 또는 패키지 미소유 SUID/SGID 파일이 존재합니다." >> "$resultfile" 2>&1
+    [ -n "$evidence_vuln" ] && echo -e "$evidence_vuln" >> "$resultfile" 2>&1
+  else
     echo "※ U-23 결과 : 양호(Good)" >> "$resultfile" 2>&1
-    echo " SUID/SGID 설정이 일부 파일에서 확인되었으나, whitelist(기본값 가능)로 분류했습니다. (Warning 항목 참고)" >> "$resultfile" 2>&1
-    return 0
   fi
 
-  echo "※ U-23 결과 : 양호(Good)" >> "$resultfile" 2>&1
-  echo " 점검 대상 주요 실행 파일에서 SUID/SGID 설정이 확인되지 않았습니다." >> "$resultfile" 2>&1
+  if (( warn_found == 1 )); then
+    echo " [참고] SUID/SGID 파일이 존재하나, whitelist 또는 추가 확인 대상으로 분류했습니다." >> "$resultfile" 2>&1
+    [ -n "$evidence_warn" ] && echo -e "$evidence_warn" >> "$resultfile" 2>&1
+  fi
+
+  echo " [참고] /tmp 권한: ${tmpperm:-N/A}, /var/tmp 권한: ${vartmpperm:-N/A} (sticky bit 't' 확인)" >> "$resultfile" 2>&1
   return 0
 }
 
