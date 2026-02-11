@@ -1742,32 +1742,41 @@ U_30() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-30(중) | 2. 파일 및 디렉토리 관리 > 2.17 UMASK 설정 관리 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : UMASK 값이 022 이상으로 설정된 경우" >> "$resultfile" 2>&1
+
     vuln_flag=0
-    # systemd UMask 점검
     for svc in $(systemctl list-unit-files --type=service --no-legend | awk '{print $1}'); do
         umask_val=$(systemctl show "$svc" -p UMask 2>/dev/null | awk -F= '{print $2}')
         [ -z "$umask_val" ] && continue
 
         umask_dec=$((8#$umask_val))
         if [ "$umask_dec" -lt 18 ]; then
+            echo "※ U-30 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+            echo " systemd 서비스 [$svc]에 설정된 UMask 값($umask_val)이 022 미만입니다." >> "$resultfile" 2>&1
             vuln_flag=1
             break
         fi
     done
-    # login.defs, PAM 점검
     if [ "$vuln_flag" -eq 0 ]; then
         if grep -q "pam_umask.so" /etc/pam.d/common-session 2>/dev/null; then
             login_umask=$(grep -E "^UMASK" /etc/login.defs 2>/dev/null | awk '{print $2}')
-            if [ -z "$login_umask" ] || [ $((8#$login_umask)) -lt 18 ]; then
+
+            if [ -z "$login_umask" ]; then
+                echo "※ U-30 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+                echo " /etc/login.defs 파일에 UMASK 설정이 존재하지 않습니다." >> "$resultfile" 2>&1
+                vuln_flag=1
+
+            elif [ $((8#$login_umask)) -lt 18 ]; then
+                echo "※ U-30 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+                echo " /etc/login.defs 파일의 UMASK 값($login_umask)이 022 미만입니다." >> "$resultfile" 2>&1
                 vuln_flag=1
             fi
         else
+            echo "※ U-30 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+            echo " PAM 설정에 pam_umask.so 모듈이 적용되어 있지 않습니다." >> "$resultfile" 2>&1
             vuln_flag=1
         fi
     fi
-    if [ "$vuln_flag" -eq 1 ]; then
-        echo "※ U-30 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    else
+    if [ "$vuln_flag" -eq 0 ]; then
         echo "※ U-30 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
 }
