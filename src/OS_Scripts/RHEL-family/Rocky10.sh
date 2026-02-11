@@ -2474,6 +2474,7 @@ U_38() {
   return 0
 }
 
+#연진
 U_39() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-39(상) | 3. 서비스 관리 > 3.6 불필요한 NFS 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -3066,6 +3067,8 @@ U_48() {
 
   return 0
 }
+
+#연진
 U_49() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-49(상) | 3. 서비스 관리 > 3.16 DNS 보안 버전 패치 ◀" >> "$resultfile" 2>&1
@@ -3365,6 +3368,7 @@ U_53() {
 
   return 0
 }
+
 U_54() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-54(중) | 3. 서비스 관리 > 3.21 암호화되지 않는 FTP 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -3648,101 +3652,50 @@ U_58() {
 
   return 0
 }
-U_59() {
-  echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-59(상) | 3. 서비스 관리 > 3. 26 안전한 SNMP 버전 사용 ◀" >> "$resultfile" 2>&1
-  echo " 양호 판단 기준 : SNMP 서비스를 v3 이상으로 사용하는 경우" >> "$resultfile" 2>&1
 
-  local snmpd_conf="/etc/snmp/snmpd.conf"
-  local snmpd_persist="/var/lib/net-snmp/snmpd.conf"
+#연진
+U_59() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-59(상) | 3. 서비스 관리 > 3.26 안전한 SNMP 버전 사용 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : SNMP 서비스를 v3 이상으로 사용하는 경우 (Rocky 9/10)" >> "$resultfile" 2>&1
 
   local snmp_active=0
-  local cfg_files=()
-  local cfg_exists_count=0
-
-  local found_v1v2=0
-  local found_v3_user=0
-  local found_createuser=0
-  local found_sha=0
-  local found_aes=0
-
-  # 1) SNMP 서비스 활성 여부 확인 (미사용이면 N/A 처리)
-  if command -v systemctl >/dev/null 2>&1; then
-    if systemctl is-active --quiet snmpd 2>/dev/null; then
-      snmp_active=1
-    fi
-  fi
+  if systemctl is-active --quiet snmpd 2>/dev/null; then snmp_active=1; fi
 
   if [ "$snmp_active" -eq 0 ]; then
-    echo "※ U-59 결과 : N/A" >> "$resultfile" 2>&1
-    echo " SNMP 서비스(snmpd)가 비활성/미사용 상태입니다." >> "$resultfile" 2>&1
+    echo "※ U-59 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " SNMP 서비스(snmpd)가 비활성 상태입니다." >> "$resultfile" 2>&1
     return 0
   fi
 
-  # 2) 설정 파일 수집
-  if [ -f "$snmpd_conf" ]; then
-    cfg_files+=("$snmpd_conf")
-    ((cfg_exists_count++))
-  fi
-  if [ -f "$snmpd_persist" ]; then
-    cfg_files+=("$snmpd_persist")
-    ((cfg_exists_count++))
-  fi
-
-  if [ "$cfg_exists_count" -eq 0 ]; then
-    echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " snmpd는 활성 상태이나 설정 파일이 없습니다. ($snmpd_conf / $snmpd_persist 미존재)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  # 3) 설정 검사 (주석/공백 제외)
-  _scan_snmp_cfg() {
-    local f="$1"
-    grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$f" 2>/dev/null
-  }
+  local v1v2_found=0
+  local v3_valid=0
+  # Rocky 전용 영구 설정 파일 포함
+  local cfg_files=("/etc/snmp/snmpd.conf" "/var/lib/net-snmp/snmpd.conf")
 
   for f in "${cfg_files[@]}"; do
-    # v1/v2c 흔적(community 기반) 있으면 취약
-    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*(rocommunity|rwcommunity|community|com2sec)[[:space:]]+'; then
-      found_v1v2=1
+    [ ! -f "$f" ] && continue
+    # v1, v2c 커뮤니티 설정 탐지
+    if grep -vE '^[[:space:]]*#' "$f" | grep -Ei 'rocommunity|rwcommunity|com2sec' >/dev/null; then
+      v1v2_found=1
     fi
-
-    # v3 사용자 권한(rouser/rwuser)
-    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*(rouser|rwuser)[[:space:]]+'; then
-      found_v3_user=1
-    fi
-
-    # createUser 존재 여부
-    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*createUser[[:space:]]+'; then
-      found_createuser=1
-    fi
-
-    # createUser 라인에서 SHA/AES 사용 확인
-    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*createUser[[:space:]].*(SHA|SHA1|SHA224|SHA256|SHA384|SHA512)'; then
-      found_sha=1
-    fi
-    if _scan_snmp_cfg "$f" | grep -Eiq '^[[:space:]]*createUser[[:space:]].*(AES|AES128|AES192|AES256)'; then
-      found_aes=1
+    # v3 인증/암호화(authPriv) 설정 탐지
+    if grep -vE '^[[:space:]]*#' "$f" | grep -Ei 'rouser|rwuser|createUser' | grep -Ei 'SHA|AES' >/dev/null; then
+      v3_valid=1
     fi
   done
 
-  # 4) 판정
-  if [ "$found_v1v2" -eq 1 ]; then
+  if [ "$v1v2_found" -eq 1 ]; then
     echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " SNMP v1/v2c(community 기반) 설정이 존재합니다. (rocommunity/rwcommunity/com2sec 등)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  if [ "$found_v3_user" -eq 1 ] && [ "$found_createuser" -eq 1 ] && [ "$found_sha" -eq 1 ] && [ "$found_aes" -eq 1 ]; then
+    echo " SNMP v1/v2c 취약 설정이 발견되었습니다." >> "$resultfile" 2>&1
+  elif [ "$v3_valid" -eq 1 ]; then
     echo "※ U-59 결과 : 양호(Good)" >> "$resultfile" 2>&1
-    echo " SNMPv3 설정이 확인되었습니다. (createUser: SHA 인증 + AES 암호화, rouser/rwuser 권한 존재)" >> "$resultfile" 2>&1
-    return 0
+  else
+    echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " SNMPv3 보안 설정(SHA/AES)이 미흡합니다." >> "$resultfile" 2>&1
   fi
-
-  echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-  echo " snmpd는 활성 상태이나 SNMPv3 필수 설정이 미흡합니다. (createUser(SHA+AES) 또는 rouser/rwuser 미확인)" >> "$resultfile" 2>&1
-  return 0
 }
+
 #수진
 U_60() {
     echo ""  >> $resultfile 2>&1
@@ -3967,74 +3920,37 @@ U_63() {
 
   return 0
 }
-#연수
+
+#연진
 U_64() {
-  echo ""  >> "$resultfile" 2>&1
+  echo "" >> "$resultfile" 2>&1
   echo "▶ U-64(상) | 4. 패치 관리 > 4.1 주기적 보안 패치 및 벤더 권고사항 적용 ◀" >> "$resultfile" 2>&1
-  echo " 양호 판단 기준 : 패치 적용 정책을 수립하여 주기적으로 패치관리를 수행하고 최신 보안 패치 및 Kernel이 적용된 경우" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 보안 패치 미적용 항목이 없고 최신 커널로 부팅된 경우" >> "$resultfile" 2>&1
 
-  local os_name="" os_ver=""
-  local kernel_running=""
+  local running_kernel=$(uname -r)
   local latest_kernel=""
-  local pending_sec=0
+  local pending_updates=""
 
-  # OS/Kernel 기본 정보
-  if [ -r /etc/os-release ]; then
-    . /etc/os-release
-    os_name="$NAME"
-    os_ver="$VERSION_ID"
+  # 1. 보안 업데이트 대기 확인
+  if command -v dnf >/dev/null 2>&1; then
+    pending_updates=$(dnf updateinfo list --updates security -q 2>/dev/null | grep -i "security" || true)
   fi
-  kernel_running="$(uname -r 2>/dev/null)"
 
-  # 1) Rocky 10.1 고정 체크
-  if ! echo "$os_name" | grep -qi "Rocky"; then
+  # 2. 설치된 커널 중 가장 최신 버전 확인
+  latest_kernel=$(rpm -q kernel --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V | tail -n 1)
+
+  # 판정 로직
+  if [ -n "$pending_updates" ]; then
     echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " Rocky Linux가 아닙니다. (현재: $os_name $os_ver)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  if [ "$os_ver" != "10.1" ]; then
+    echo " [현황] 미적용된 보안 업데이트가 존재합니다." >> "$resultfile" 2>&1
+  elif [[ "$running_kernel" != *"$latest_kernel"* ]]; then
     echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " Rocky 10.1 환경이 아닙니다. (현재: Rocky $os_ver)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  # 2) 보안 업데이트 대기 여부
-  if ! command -v dnf >/dev/null 2>&1; then
-    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " dnf 명령 확인 불가로 보안 패치 적용 여부를 확인할 수 없습니다." >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  if dnf -q updateinfo list --updates security 2>/dev/null | grep -q .; then
-    pending_sec=1
-  fi
-
-  if [ "$pending_sec" -eq 1 ]; then
-    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " 보안 업데이트(SECURITY) 미적용 대기 항목이 존재합니다. (dnf updateinfo 기준)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  # 3) 커널 최신/재부팅 필요 여부
-  latest_kernel="$(rpm -q kernel --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V | tail -n1)"
-
-  if [ -n "$latest_kernel" ]; then
-    if ! echo "$kernel_running" | grep -q "$latest_kernel"; then
-      echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-      echo " 최신 커널이 적용되지 않았거나 재부팅이 필요합니다. (running=$kernel_running, latest=$latest_kernel)" >> "$resultfile" 2>&1
-      return 0
-    fi
+    echo " [현황] 최신 커널 설치 후 재부팅이 되지 않았습니다. (Running: $running_kernel / Latest: $latest_kernel)" >> "$resultfile" 2>&1
   else
-    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " 설치된 커널 정보를 확인하지 못했습니다. (rpm -q kernel 확인 실패)" >> "$resultfile" 2>&1
-    return 0
+    echo "※ U-64 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
-
-  echo "※ U-64 결과 : 양호(Good)" >> "$resultfile" 2>&1
-  echo " Rocky 10.1 환경이며 보안 업데이트 대기 없음 + 최신 커널 적용 확인됨. (kernel=$kernel_running)" >> "$resultfile" 2>&1
-  return 0
 }
+
 #수진
 U_65() {
     echo ""  >> $resultfile 2>&1

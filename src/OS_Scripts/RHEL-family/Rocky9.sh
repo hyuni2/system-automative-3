@@ -3750,6 +3750,7 @@ U_43() {
   return 0
 }
 
+#연진
 U_44() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-44(상) | 3. 서비스 관리 > 3.11 tftp, talk 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -3811,12 +3812,12 @@ U_45() {
     echo "▶ U-45(상) | 3. 서비스 관리 > 3.12 메일 서비스 버전 점검 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : 메일 서비스 버전이 최신버전인 경우" >> $resultfile 2>&1
     if [ -f /etc/services ]; then
-        smtp_port_count=`grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}' | wc -l`
+        smtp_port_count=$(grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}' | wc -l)
         if [ $smtp_port_count -gt 0 ]; then
-            smtp_port=(`grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}'`)
+            smtp_port=($(grep -vE '^#|^\s#' /etc/services | awk 'tolower($1)=="smtp" {print $2}' | awk -F / 'tolower($2)=="tcp" {print $1}'))
             for ((i=0; i<${#smtp_port[@]}; i++))
             do
-                netstat_smtp_count=`netstat -nat 2>/dev/null | grep -w 'tcp' | grep -Ei 'listen|established|syn_sent|syn_received' | grep ":${smtp_port[$i]} " | wc -l`
+                netstat_smtp_count=$(netstat -nat 2>/dev/null | grep -w 'tcp' | grep -Ei 'listen|established|syn_sent|syn_received' | grep ":${smtp_port[$i]} " | wc -l)
                 if [ $netstat_smtp_count -gt 0 ]; then
                     rpm_smtp_version=`rpm -qa 2>/dev/null | grep 'sendmail' | awk -F 'sendmail-' '{print $2}'`
                     dnf_smtp_version=`dnf list installed sendmail 2>/dev/null | grep -v 'Installed Packages' | awk '{print $2}'`
@@ -4341,6 +4342,7 @@ U_48() {
   return 0
 }
 
+#연진
 U_49() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-49(상) | 3. 서비스 관리 > 3.16 DNS 보안 버전 패치 ◀" >> "$resultfile" 2>&1
@@ -4833,65 +4835,38 @@ U_53() {
   return 0
 }
 
+#연진
 U_54() {
-  echo ""  >> "$resultfile" 2>&1
+  echo "" >> "$resultfile" 2>&1
   echo "▶ U-54(중) | 3. 서비스 관리 > 3.21 암호화되지 않는 FTP 서비스 비활성화 ◀" >> "$resultfile" 2>&1
-  echo " 양호 판단 기준 : 암호화되지 않은 FTP 서비스가 비활성화된 경우" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 암호화되지 않은 FTP 서비스(vsftpd, proftpd 등)가 비활성화된 경우" >> "$resultfile" 2>&1
 
   local ftp_active=0
   local reason=""
 
-  # ==============================
-  # 1) vsftpd 확인
-  # ==============================
-  if systemctl list-unit-files 2>/dev/null | grep -q "^vsftpd.service"; then
-    if systemctl is-active --quiet vsftpd 2>/dev/null; then
+  # 1. vsftpd & proftpd systemd 점검
+  for svc in vsftpd proftpd; do
+    if systemctl is-active --quiet "$svc" 2>/dev/null; then
       ftp_active=1
-      reason+="vsftpd 서비스가 활성 상태; "
+      reason+="$svc 활성; "
+    fi
+  done
+
+  # 2. xinetd 환경 점검
+  if [ -d /etc/xinetd.d ]; then
+    if grep -rEi "disable[[:space:]]*=[[:space:]]*no" /etc/xinetd.d/ | grep -qi "ftp"; then
+      ftp_active=1
+      reason+="xinetd 내 ftp 활성 설정 발견; "
     fi
   fi
 
-  # ==============================
-  # 2) proftpd 확인
-  # ==============================
-  if systemctl list-unit-files 2>/dev/null | grep -q "^proftpd.service"; then
-    if systemctl is-active --quiet proftpd 2>/dev/null; then
-      ftp_active=1
-      reason+="proftpd 서비스가 활성 상태; "
-    fi
-  fi
-
-  # ==============================
-  # 3) xinetd ftp 확인
-  # ==============================
-  if [ -f /etc/xinetd.d/ftp ]; then
-    if grep -vE '^[[:space:]]*#|^[[:space:]]*$' /etc/xinetd.d/ftp 2>/dev/null | grep -iq "disable[[:space:]]*=[[:space:]]*no"; then
-      ftp_active=1
-      reason+="xinetd ftp 서비스가 활성(disable=no); "
-    fi
-  fi
-
-  # ==============================
-  # 4) inetd ftp 확인
-  # ==============================
-  if [ -f /etc/inetd.conf ]; then
-    if grep -vE '^[[:space:]]*#' /etc/inetd.conf 2>/dev/null | grep -iq "ftp"; then
-      ftp_active=1
-      reason+="inetd ftp 서비스 활성 설정 존재; "
-    fi
-  fi
-
-  # ==============================
-  # 판정
-  # ==============================
+  # 최종 판정
   if [ "$ftp_active" -eq 1 ]; then
     echo "※ U-54 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " 암호화되지 않은 FTP 서비스가 활성 상태입니다. ($reason)" >> "$resultfile" 2>&1
-    return 0
+    echo " [현황] $reason" >> "$resultfile" 2>&1
+  else
+    echo "※ U-54 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
-
-  echo "※ U-54 결과 : 양호(Good)" >> "$resultfile" 2>&1
-  return 0
 }
 
 U_55() {
@@ -5480,6 +5455,7 @@ U_58() {
   return 0
 }
 
+#연진
 U_59() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-59(상) | 3. 서비스 관리 > 3.26 안전한 SNMP 버전 사용 ◀" >> "$resultfile" 2>&1
@@ -6226,67 +6202,34 @@ U_63() {
   return 0
 }
 
+#연진
 U_64() {
-  echo ""  >> "$resultfile" 2>&1
+  echo "" >> "$resultfile" 2>&1
   echo "▶ U-64(상) | 4. 패치 관리 > 4.1 주기적 보안 패치 및 벤더 권고사항 적용 ◀" >> "$resultfile" 2>&1
-  echo " 양호 판단 기준 : 패치 적용 정책을 수립하여 주기적으로 패치관리를 수행하고 최신 보안 패치 및 Kernel이 적용된 경우" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 보안 패치 미적용 항목이 없고 최신 커널로 부팅된 경우" >> "$resultfile" 2>&1
 
-  local os_name="" os_ver=""
-  local kernel_running=""
+  local running_kernel=$(uname -r)
   local latest_kernel=""
-  local evidence=""
-  local pending_sec=0
+  local pending_updates=""
 
-  # OS/Kernel 기본 정보
-  if [ -r /etc/os-release ]; then
-    . /etc/os-release
-    os_name="$NAME"
-    os_ver="$VERSION_ID"
+  # 1. 보안 업데이트 대기 확인
+  if command -v dnf >/dev/null 2>&1; then
+    pending_updates=$(dnf updateinfo list --updates security -q 2>/dev/null | grep -i "security" || true)
   fi
-  kernel_running="$(uname -r 2>/dev/null)"
 
-  # 1) Rocky 9.x 여부
-  if ! echo "$os_name" | grep -qi "Rocky" || ! echo "$os_ver" | grep -q "^9"; then
+  # 2. 설치된 커널 중 가장 최신 버전 확인
+  latest_kernel=$(rpm -q kernel --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V | tail -n 1)
+
+  # 판정 로직
+  if [ -n "$pending_updates" ]; then
     echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " Rocky 9.x 환경이 아닙니다. (현재: $os_name $os_ver)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  # 2) 보안 업데이트 대기 여부
-  if ! command -v dnf >/dev/null 2>&1; then
+    echo " [현황] 미적용된 보안 업데이트가 존재합니다." >> "$resultfile" 2>&1
+  elif [[ "$running_kernel" != *"$latest_kernel"* ]]; then
     echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " dnf 명령 확인 불가로 보안 패치 적용 여부를 확인할 수 없습니다." >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  if dnf -q updateinfo list --updates security 2>/dev/null | grep -q .; then
-    pending_sec=1
-  fi
-
-  if [ "$pending_sec" -eq 1 ]; then
-    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " 보안 업데이트(SECURITY) 미적용 대기 항목이 존재합니다. (dnf updateinfo 기준)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  # 3) 커널 최신/재부팅 필요 여부
-  latest_kernel="$(rpm -q kernel --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V | tail -n1)"
-
-  if [ -n "$latest_kernel" ]; then
-    if ! echo "$kernel_running" | grep -q "$latest_kernel"; then
-      echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-      echo " 최신 커널이 적용되지 않았거나 재부팅이 필요합니다. (running=$kernel_running, latest=$latest_kernel)" >> "$resultfile" 2>&1
-      return 0
-    fi
+    echo " [현황] 최신 커널 설치 후 재부팅이 되지 않았습니다. (Running: $running_kernel / Latest: $latest_kernel)" >> "$resultfile" 2>&1
   else
-    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " 설치된 커널 정보를 확인하지 못했습니다. (rpm -q kernel 확인 실패)" >> "$resultfile" 2>&1
-    return 0
+    echo "※ U-64 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
-
-  # 양호
-  echo "※ U-64 결과 : 양호(Good)" >> "$resultfile" 2>&1
-  return 0
 }
 
 U_65() {

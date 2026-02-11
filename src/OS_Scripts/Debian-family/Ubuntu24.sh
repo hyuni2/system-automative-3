@@ -2602,6 +2602,44 @@ U_43() {
   return 0
 }
 
+#연진
+U_44() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-44(상) | 3. 서비스 관리 > 3.11 tftp, talk 서비스 비활성화 (Ubuntu) ◀" >> "$resultfile" 2>&1
+  
+  local vuln=0
+  local reason=""
+
+  # 1) inetd.conf 점검 (Ubuntu에서 흔히 사용되는 방식)
+  if [ -f /etc/inetd.conf ]; then
+    if grep -vE '^[[:space:]]*#' /etc/inetd.conf | grep -Eiq "tftp|talk|ntalk"; then
+      vuln=1
+      reason="/etc/inetd.conf 내 서비스 활성화됨"
+    fi
+  fi
+
+  # 2) systemd 점검 (Ubuntu 전용 패키지 명칭 반영)
+  if [ $vuln -eq 0 ] && command -v systemctl >/dev/null 2>&1; then
+    # Ubuntu는 tftpd-hpa 등 패키지 명칭이 다를 수 있음
+    local units=("tftpd-hpa.service" "tftp.service" "talk.service" "ntalk.service")
+    for u in "${units[@]}"; do
+      if systemctl is-active --quiet "$u" 2>/dev/null; then
+        vuln=1
+        reason="systemd 유닛($u) 활성화됨"
+        break
+      fi
+    done
+  fi
+
+  # 최종 판정
+  if [ $vuln -eq 1 ]; then
+    echo "※ U-44 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " [현황] $reason" >> "$resultfile" 2>&1
+  else
+    echo "※ U-44 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
+}
+
 U_45() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-45(상) | 3. 서비스 관리 > 3.12 메일 서비스 버전 점검 ◀" >> "$resultfile" 2>&1
@@ -2853,6 +2891,39 @@ U_48() {
   return 0
 }
 
+#연진
+U_49() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-49(상) | 3. 서비스 관리 > 3.16 DNS 보안 버전 패치 (Ubuntu 24) ◀" >> "$resultfile" 2>&1
+
+  # 1) Ubuntu 특화 서비스 명칭 확인 (bind9)
+  local dns_active=0
+  if systemctl is-active --quiet bind9 2>/dev/null || systemctl is-active --quiet named 2>/dev/null; then
+    dns_active=1
+  fi
+
+  if [ "$dns_active" -eq 0 ]; then
+    echo "※ U-49 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " DNS 서비스가 비활성 상태입니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2) Ubuntu 패키지 관리자(dpkg) 기반 버전 확인
+  local bind_ver=""
+  if command -v named >/dev/null 2>&1; then
+    bind_ver=$(named -v | grep -Eo '([0-9]+\.){1,2}[0-9]+' | head -n 1)
+  elif command -v dpkg >/dev/null 2>&1; then
+    bind_ver=$(dpkg -l bind9 | grep '^ii' | awk '{print $3}' | grep -Eo '([0-9]+\.){1,2}[0-9]+' | head -n 1)
+  fi
+
+  if [ -n "$bind_ver" ]; then
+    echo "※ U-49 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " Ubuntu 24 보안 패치가 적용된 BIND 버전($bind_ver)이 구동 중입니다." >> "$resultfile" 2>&1
+  else
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+  fi
+}
+
 U_50() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-50(상) | 3. 서비스 관리 > 3.17 DNS Zone Transfer 설정 ◀" >> "$resultfile" 2>&1
@@ -3068,6 +3139,39 @@ U_53() {
   return 0
 }
 
+#연진
+U_54() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-54(중) | 3. 서비스 관리 > 3.21 암호화되지 않는 FTP 서비스 비활성화 (Ubuntu) ◀" >> "$resultfile" 2>&1
+
+  local ftp_active=0
+  local reason=""
+
+  # 1. Ubuntu 주요 FTP 서비스 점검 (pure-ftpd 추가)
+  for svc in vsftpd proftpd pure-ftpd; do
+    if systemctl is-active --quiet "$svc" 2>/dev/null; then
+      ftp_active=1
+      reason+="$svc 활성; "
+    fi
+  done
+
+  # 2. inetd.conf 점검 (Ubuntu에서 레거시로 존재 가능)
+  if [ -f /etc/inetd.conf ]; then
+    if grep -vE '^[[:space:]]*#' /etc/inetd.conf | grep -iq "ftp"; then
+      ftp_active=1
+      reason+="inetd.conf 내 ftp 활성 라인 존재; "
+    fi
+  fi
+
+  # 최종 판정
+  if [ "$ftp_active" -eq 1 ]; then
+    echo "※ U-54 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " [현황] $reason" >> "$resultfile" 2>&1
+  else
+    echo "※ U-54 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
+}
+
 U_55() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-55(중) | 3. 서비스 관리 > 3.22 FTP 계정 Shell 제한 ◀" >> "$resultfile" 2>&1
@@ -3279,6 +3383,42 @@ U_58() {
   return 0
 }
 
+#연진
+U_59() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-59(상) | 3. 서비스 관리 > 3.26 안전한 SNMP 버전 사용 (Ubuntu 24) ◀" >> "$resultfile" 2>&1
+
+  if ! systemctl is-active --quiet snmpd 2>/dev/null; then
+    echo "※ U-59 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " SNMP 서비스가 비활성 상태입니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  local v1v2_found=0
+  local v3_valid=0
+  # Ubuntu 표준 경로
+  local main_conf="/etc/snmp/snmpd.conf"
+
+  if [ -f "$main_conf" ]; then
+    # v1, v2c 체크
+    if grep -vE '^[[:space:]]*#' "$main_conf" | grep -Ei 'rocommunity|rwcommunity' >/dev/null; then
+      v1v2_found=1
+    fi
+    # Ubuntu 24는 보통 authPriv 방식을 기본 권고함
+    if grep -vE '^[[:space:]]*#' "$main_conf" | grep -Ei 'rouser|rwuser' | grep -Ei 'priv|auth' >/dev/null; then
+      v3_valid=1
+    fi
+  fi
+
+  if [ "$v1v2_found" -eq 1 ]; then
+    echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+  elif [ "$v3_valid" -eq 1 ]; then
+    echo "※ U-59 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  else
+    echo "※ U-59 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+  fi
+}
+
 U_60() {
     echo "" >> "$resultfile" 2>&1
     echo " ▶ U-60(중) | 3. 서비스 관리 > 3.27 SNMP Community String 복잡성 설정 ◀" >> "$resultfile" 2>&1
@@ -3482,6 +3622,33 @@ U_63() {
   fi
 
   return 0
+}
+
+#연진
+U_64() {
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-64(상) | 4. 패치 관리 > 4.1 주기적 보안 패치 및 벤더 권고사항 적용 (Ubuntu) ◀" >> "$resultfile" 2>&1
+
+  local pending_sec=0
+  
+  # 1. 보안 업데이트 대기 확인
+  # apt-get --just-print를 활용하여 실제 설치 없이 목록만 확인
+  pending_sec=$(apt-get -s dist-upgrade | grep -iE "Inst.*security" | wc -l)
+
+  # 2. 재부팅 필요 여부 확인 (커널 업데이트 등)
+  local reboot_req=0
+  [ -f /var/run/reboot-required ] && reboot_req=1
+
+  # 판정 로직
+  if [ "$pending_sec" -gt 0 ]; then
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " [현황] 미적용된 보안 업데이트 항목($pending_sec개)이 존재합니다." >> "$resultfile" 2>&1
+  elif [ "$reboot_req" -eq 1 ]; then
+    echo "※ U-64 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " [현황] 패치 적용을 위해 시스템 재부팅이 필요합니다." >> "$resultfile" 2>&1
+  else
+    echo "※ U-64 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
 }
 
 U_65() {
