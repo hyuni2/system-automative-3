@@ -449,18 +449,25 @@ if st.session_state.page == "main":
 
     st.markdown("""
     <div class="section">
-        <h2>Project</h2>
+        <h2>About Project</h2>
         <p>
-            Ansible 기반으로 리눅스 서버의 보안 취약점을 자동 점검하고<br>
-            JSON 결과를 시각화하여 제공하는 웹 대시보드입니다.
+            주요정보통신기반시설 기술적 취약점 분석 상세 가이드(2026)를 기반으로<br>
+            여러 리눅스 서버의 보안 취약점 점검 자동화를 목표로 개발되었습니다.<br>
+            여기에 파일 pdf 로 첨부할까 아님 kisa 페이지 링크 연결할까 <br><br>
+            <ul>[ 주요 제공 서비스]
+                <li>1.</li>
+                <li>2.</li>
+                <li>3.</li>
+                <li>4.</li>
+            </ul><br>
+            추가적으로, CVE(Common Vulnerabiliteis and Exposurs) ~~~ 서비스도 제공합니다.<br>
+            왜 진단가이드뿐만 아니라 CVE 추가했는지 그럴싸한 취지가 들어가면 좋을 것 같음 
         </p>
-
         <hr>
-
         <h2>About us</h2>
         <p>
-            주요정보통신기반시설 취약점 점검 가이드를 기반으로<br>
-            자동화·표준화를 목표로 개발하고 있습니다.
+            팀원 소개
+            -> 뭐뭐 넣을건지 / 이름 이메일 사진(?)
         </p>
     </div>
     """, unsafe_allow_html=True)
