@@ -70,10 +70,9 @@ U_01() {
     fi
 }
 
-
 U_02() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-02(상) | 1. 계정관리 > 비밀번호 관리정책 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-02(상) | 1. 계정관리 > 1.2 비밀번호 관리정책 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 로그인/패스워드 정책이 기준에 맞게 설정된 경우" >> "$resultfile" 2>&1
 
   local NA=0
@@ -334,10 +333,9 @@ U_02() {
   return 0
 }
 
-
 U_03() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-03(상) | UNIX > 1. 계정 관리| 계정 잠금 임계값 설정 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-03(상) | 1. 계정 관리 > 1.3 계정 잠금 임계값 설정 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 계정 잠금 임계값이 10회 이하의 값으로 설정되어 있는 경우"  >> "$resultfile" 2>&1
 
   local pam_auth="/etc/pam.d/common-auth"
@@ -443,7 +441,6 @@ U_05() {
 	fi
 }
 
-
 U_06(){
     echo "" >> $resultfile 2>&1
     echo "▶ U-06(상) | 1. 계정관리 > 1.6 사용자 계정 su 기능 제한 ◀" >> $resultfile 2>&1
@@ -482,10 +479,9 @@ U_06(){
     fi
 }
 
-
 U_07() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-07(하) | 1. 계정관리 | 불필요한 계정 제거 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-07(하) | 1. 계정관리 > 1.7 불필요한 계정 제거 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 불필요한 계정이 존재하지 않는 경우" >> "$resultfile" 2>&1
   echo " 점검 방식 : 자동으로 '관리 필요' 후보를 탐지(운영 정책에 따라 최종 판단 필요)" >> "$resultfile" 2>&1
 
@@ -592,10 +588,9 @@ U_07() {
   return 0
 }
 
-
 U_08() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-08(중) | UNIX > 1. 계정 관리| 관리자 그룹에 최소한의 계정 포함 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-08(중) | 1. 계정 관리 > 1.8 관리자 그룹에 최소한의 계정 포함 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 관리자 그룹에 불필요한 계정이 등록되어 있지 않은 경우" >> "$resultfile" 2>&1
 
   local admin_groups=("sudo" "admin")
@@ -690,7 +685,7 @@ U_08() {
 #연진
 U_09() {
     echo "" >> "$resultfile" 2>&1
-    echo "▶ U-09(하) | 1. 계정관리 > 1.12 계정이 존재하지 않는 GID 금지 ◀" >> "$resultfile" 2>&1
+    echo "▶ U-09(하) | 1. 계정관리 > 1.9 계정이 존재하지 않는 GID 금지 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : 시스템 관리나 운용에 불필요한 그룹이 삭제 되어있는 경우" >> "$resultfile" 2>&1
 
     # 1. /etc/passwd에서 현재 사용 중인 모든 기본 GID 추출
@@ -737,7 +732,6 @@ U_10() {
 	return 0
 }
 
-
 U_11(){
     echo "" >> $resultfile 2>&1
     echo "▶ U-11(하) | 1. 계정관리 > 1.11 사용자 shell 점검 ◀" >> $resultfile 2>&1
@@ -779,10 +773,9 @@ U_11(){
     fi
 }
 
-
 U_12() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-12(하) | 1. 계정관리 > 세션 종료 시간 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-12(하) | 1. 계정관리 > 1.12 세션 종료 시간 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : bash/sh 계열에서 TMOUT 값이 600초(10분) 이하로 설정되어 있고 export 되어 있는 경우" >> "$resultfile" 2>&1
 
   local TARGET_MAX=600
@@ -867,11 +860,10 @@ U_12() {
   return 0
 }
 
-
 U_13() {
   local shadow="/etc/shadow"
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-13(중) | UNIX > 1. 계정관리 > 안전한 비밀번호 암호화 알고리즘 사용 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-13(중) | 1. 계정관리 > 1.13 안전한 비밀번호 암호화 알고리즘 사용 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 안전한 알고리즘(yescrypt:\\\$y\\\$, SHA-2:\\\$5/\\\$6)을 사용하는 경우" >> "$resultfile" 2>&1
 
   local shadow="/etc/shadow"
@@ -1015,7 +1007,6 @@ U_15() {
     fi
 }
 
-
 U_16(){
     echo "" >> $resultfile 2>&1
     echo "▶ U-16(상) | 2. 파일 및 디렉토리 관리 > 2.3 /etc/passwd 파일 소유자 및 권한 설정 ◀" >> $resultfile 2>&1
@@ -1056,10 +1047,9 @@ U_16(){
 
 }
 
-
 U_17() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-17(상) | 2. 파일 및 디렉터리 관리 > 시스템 시작파일 및 환경파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-17(상) | 2. 파일 및 디렉터리 관리 > 2.4 시스템 시작파일 및 환경파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 시스템 시작/환경 파일이 root 소유이며 다른 사용자 쓰기 권한이 없는 경우" >> "$resultfile" 2>&1
 
   local NA=0
@@ -1133,10 +1123,9 @@ U_17() {
   return 0
 }
 
-
 U_18() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-18(상) | UNIX > 2. 파일 및 디렉토리 관리| /etc/shadow 파일 소유자 및 권한 설정 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-18(상) | 2. 파일 및 디렉토리 관리 > 2.5 /etc/shadow 파일 소유자 및 권한 설정 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /etc/shadow 파일의 소유자가 root이고, 권한이 400인 경우"  >> "$resultfile" 2>&1
 
   local target="/etc/shadow"
@@ -1304,7 +1293,6 @@ U_20() {
     return 0
 }
 
-
 U_21(){
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-21(상) | 2. 파일 및 디렉토리 관리 > 2.8 /etc/(r)syslog.conf 파일 소유자 및 권한 설정 ◀"  >> "$resultfile" 2>&1
@@ -1348,10 +1336,9 @@ U_21(){
 
 }
 
-
 U_22() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-22(상) | 2. 파일 및 디렉터리 관리 > /etc/services 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-22(상) | 2. 파일 및 디렉터리 관리 > 2.9 /etc/services 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /etc/services 파일이 root 소유이고 권한이 644 이하이며 기타 사용자 쓰기 권한이 없는 경우" >> "$resultfile" 2>&1
 
   local target="/etc/services"
@@ -1386,10 +1373,9 @@ U_22() {
   return 0
 }
 
-
 U_23() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-23(상) | UNIX > 2. 파일 및 디렉토리 관리| SUID, SGID, Sticky bit 설정 파일 점검 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-23(상) | 2. 파일 및 디렉토리 관리 > 2.10 SUID, SGID, Sticky bit 설정 파일 점검 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 주요 실행파일의 권한에 SUID와 SGID에 대한 설정이 부여되어 있지 않은 경우"  >> "$resultfile" 2>&1
 
   local executables=(
@@ -1467,7 +1453,6 @@ U_23() {
   return 0
 }
 
-
 #연진
 U_24() {
     echo "" >> "$resultfile" 2>&1
@@ -1543,10 +1528,9 @@ U_25() {
     fi
 }
 
-
 U_26(){
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-26(상) | 2. 파일 및 디렉토리 관리 > /dev에 존재하지 않는 device 파일 점검 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-26(상) | 2. 파일 및 디렉토리 관리 > 2.13 /dev에 존재하지 않는 device 파일 점검 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /dev 디렉터리에 대한 파일 점검 후 존재하지 않는 device 파일을 제거한 경우" >> "$resultfile" 2>&1
 
   local target_dir="/dev"
@@ -1575,10 +1559,9 @@ U_26(){
   fi
 }
 
-
 U_27() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-27(중) | 2. 파일 및 디렉터리 관리 > .rhosts, hosts.equiv 사용 제한 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-27(중) | 2. 파일 및 디렉터리 관리 > 2.14 .rhosts, hosts.equiv 사용 제한 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : r-command 서비스를 사용하지 않거나(.rhosts/hosts.equiv 미사용), 사용 시 파일 권한/내용이 안전한 경우" >> "$resultfile" 2>&1
 
   local NA=0
@@ -1664,10 +1647,9 @@ U_27() {
   return 0
 }
 
-
 U_28() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-28(상) | UNIX > 2. 파일 및 디렉토리 관리 > 접속 IP 및 포트 제한 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-28(상) | 2. 파일 및 디렉토리 관리 > 2.15 접속 IP 및 포트 제한 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 접속을 허용할 특정 호스트에 대한 IP 주소 및 포트 제한을 설정한 경우" >> "$resultfile" 2>&1
 
   local deny="/etc/hosts.deny"
@@ -1742,8 +1724,6 @@ U_28() {
   return 0
 }
 
-
-
 U_29() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-29(하) | 2. 파일 및 디렉토리 관리 > 2.16 hosts.lpd 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
@@ -1811,7 +1791,6 @@ U_30() {
     fi
 }
 
-
 U_31() {
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-31(중) | 2. 파일 및 디렉토리 관리 > 2.18 홈 디렉토리 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
@@ -1854,10 +1833,9 @@ U_31() {
   fi
 }
 
-
 U_32() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-32(중) | 2. 파일 및 디렉터리 관리 > 사용자 계정 홈디렉터리 존재 및 권한 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-32(중) | 2. 파일 및 디렉터리 관리 > 2.19 사용자 계정 홈디렉터리 존재 및 권한 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 사용자 계정의 홈디렉터리가 존재하며, 소유자/권한이 적절한 경우" >> "$resultfile" 2>&1
 
   local UID_MIN=1000
@@ -1932,10 +1910,9 @@ U_32() {
   return 0
 }
 
-
 U_33() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-33(하) | UNIX > 2. 파일 및 디렉토리 관리 > 숨겨진 파일 및 디렉토리 검색 및 제거 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-33(하) | 2. 파일 및 디렉토리 관리 > 2.20 숨겨진 파일 및 디렉토리 검색 및 제거 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 불필요하거나 의심스러운 숨겨진 파일 및 디렉터리를 삭제한 경우" >> "$resultfile" 2>&1
 
   ALL_HIDDEN=$(find / \
@@ -1970,8 +1947,6 @@ U_33() {
 
   return 0
 }
-
-
 
 U_34() {
     echo "" >> "$resultfile" 2>&1
@@ -2143,7 +2118,6 @@ U_35() {
     fi
 }
 
-
 U_36(){
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-36(상) | 3. 서비스 관리 > 3.3 r 계열 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -2184,10 +2158,9 @@ U_36(){
   fi
 }
 
-
 U_37() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-37(상) | 3. 서비스 관리 > cron/at 관련 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-37(상) | 3. 서비스 관리 > 3.4 cron/at 관련 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : cron/at 관련 파일이 root 소유이며 다른 사용자 쓰기 권한이 없는 경우" >> "$resultfile" 2>&1
 
   local -a bad=()
@@ -2253,10 +2226,9 @@ U_37() {
   return 0
 }
 
-
 U_38() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-38(상) | UNIX > 3. 서비스 관리 | DoS 공격에 취약한 서비스 비활성화 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-38(상) | 3. 서비스 관리 > 3.5 DoS 공격에 취약한 서비스 비활성화 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : (1) 해당 서비스를 사용하지 않는 경우 N/A, (2) DoS 공격에 취약한 서비스가 비활성화된 경우" >> "$resultfile" 2>&1
 
   local in_scope_active=0
@@ -2342,7 +2314,6 @@ U_38() {
   return 0
 }
 
-
 U_40() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-40(상) | 3. 서비스 관리 > 3.7 NFS 접근 통제 ◀" >> "$resultfile" 2>&1
@@ -2378,7 +2349,6 @@ U_40() {
     fi
 }
 
-
 U_41(){
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-41(상) | 3. 서비스 관리 > 3.8 불필요한 automountd 제거 ◀" >> "$resultfile" 2>&1
@@ -2407,10 +2377,9 @@ U_41(){
   fi
 }
 
-
 U_42() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-42(상) | 3. 서비스 관리 > RPC 서비스 확인 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-42(상) | 3. 서비스 관리 > 3.9 RPC 서비스 확인 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 불필요한 RPC 서비스가 동작하지 않는 경우" >> "$resultfile" 2>&1
 
   local -a bad=()
@@ -2474,10 +2443,9 @@ U_42() {
   return 0
 }
 
-
 U_43() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-43(상) | UNIX > 3. 서비스 관리 > NIS, NIS+ 점검 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-43(상) | 3. 서비스 관리 > 3.10 NIS, NIS+ 점검 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : (1) NIS 서비스를 사용하지 않는 경우 N/A, (2) 사용 시 NIS 서비스 비활성화 또는 불가피 시 NIS+ 사용" >> "$resultfile" 2>&1
 
   local mail_like_na=0   # N/A 여부 (여기서는 nis_in_use의 반대 개념)
@@ -2557,7 +2525,6 @@ U_43() {
   return 0
 }
 
-
 U_45() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-45(상) | 3. 서비스 관리 > 3.12 메일 서비스 버전 점검 ◀" >> "$resultfile" 2>&1
@@ -2587,7 +2554,6 @@ U_45() {
     echo "※ U-45 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
     echo " 메일 서비스(sendmail)가 동작 중이나 버전 정보를 확인할 수 없습니다." >> "$resultfile" 2>&1
 }
-
 
 U_46(){
   echo "" >> "$resultfile" 2>&1
@@ -2620,10 +2586,9 @@ U_46(){
   fi
 }
 
-
 U_47() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-47(상) | 3. 서비스 관리 > 스팸 메일 릴레이 제한 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-47(상) | 3. 서비스 관리 > 3.14 스팸 메일 릴레이 제한 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : SMTP 릴레이가 인증/허용 네트워크로 제한되어 오픈 릴레이가 아닌 경우" >> "$resultfile" 2>&1
 
   local listening=0
@@ -2689,10 +2654,9 @@ U_47() {
   return 0
 }
 
-
 U_48() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-48(중) | UNIX > 3. 서비스 관리 > expn, vrfy 명령어 제한 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-48(중) | 3. 서비스 관리 > 3.15 expn, vrfy 명령어 제한 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : (1) 메일 서비스를 사용하지 않는 경우 N/A, (2) 사용 시 VRFY/EXPN 제한 설정이 적용된 경우" >> "$resultfile" 2>&1
 
   local mail_in_use=0
@@ -2812,7 +2776,6 @@ U_48() {
   return 0
 }
 
-
 U_50() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-50(상) | 3. 서비스 관리 > 3.17 DNS Zone Transfer 설정 ◀" >> "$resultfile" 2>&1
@@ -2836,7 +2799,6 @@ U_50() {
     fi
     echo "※ U-50 결과 : 양호(Good)" >> "$resultfile" 2>&1
 }
-
 
 U_51(){
   echo "" >> "$resultfile" 2>&1
@@ -2886,10 +2848,9 @@ U_51(){
   fi
 }
 
-
 U_52() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-52(중) | 3. 서비스 관리 > DNS 보안 버전 정보 숨김 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-52(중) | 3. 서비스 관리 > 3.19 DNS 보안 버전 정보 숨김 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : DNS(BIND) 사용 시 버전 정보가 노출되지 않도록 version 옵션이 적절히 설정된 경우" >> "$resultfile" 2>&1
 
   local listening=0
@@ -2939,10 +2900,9 @@ U_52() {
   return 0
 }
 
-
 U_53() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-53(하) | UNIX > 3. 서비스 관리 > FTP 서비스 정보 노출 제한 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-53(하) | 3. 서비스 관리 > 3.20 FTP 서비스 정보 노출 제한 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : FTP 접속 배너에 노출되는 정보가 없는 경우" >> "$resultfile" 2>&1
 
   local listen_info=""
@@ -3031,7 +2991,6 @@ U_53() {
   return 0
 }
 
-
 U_55() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-55(중) | 3. 서비스 관리 > 3.22 FTP 계정 Shell 제한 ◀" >> "$resultfile" 2>&1
@@ -3066,7 +3025,6 @@ U_55() {
         echo " ftp 계정에 /bin/false 또는 nologin 쉘이 부여되어 있습니다." >> "$resultfile" 2>&1
     fi
 }
-
 
 U_56(){
   echo "" >> "$resultfile" 2>&1
@@ -3132,10 +3090,9 @@ U_56(){
   fi
 }
 
-
 U_57() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-57(중) | 3. 서비스 관리 > ftpusers 파일 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-57(중) | 3. 서비스 관리 > 3.24 ftpusers 파일 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : FTP 사용 시 root 등 중요 계정의 FTP 접속이 제한되어 있는 경우" >> "$resultfile" 2>&1
 
   local ftp_on=0
@@ -3191,10 +3148,9 @@ U_57() {
   return 0
 }
 
-
 U_58() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-58(중) | UNIX > 3. 서비스 관리 > 불필요한 SNMP 서비스 구동 점검 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-58(중) | 3. 서비스 관리 > 3.25 불필요한 SNMP 서비스 구동 점검 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : SNMP 서비스를 사용하지 않는 경우" >> "$resultfile" 2>&1
 
   local found=0
@@ -3245,7 +3201,6 @@ U_58() {
 
   return 0
 }
-
 
 U_60() {
     echo "" >> "$resultfile" 2>&1
@@ -3313,7 +3268,6 @@ U_60() {
     fi
 }
 
-
 U_61(){
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-61(상) | 3. 서비스 관리 > 3.28 SNMP Access Control 설정 ◀" >> "$resultfile" 2>&1
@@ -3364,10 +3318,9 @@ U_61(){
   fi
 }
 
-
 U_62() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-62(상) | 3. 서비스 관리 > 경고 메시지 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-62(상) | 3. 서비스 관리 > 3.29 경고 메시지 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 로그인(SSH/콘솔) 시 비인가 접근 금지 경고 문구가 설정된 경우" >> "$resultfile" 2>&1
 
   local -a warn_files=("/etc/issue" "/etc/issue.net" "/etc/motd")
@@ -3419,10 +3372,9 @@ U_62() {
   return 0
 }
 
-
 U_63() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-63(중) | UNIX > 3. 서비스 관리 > sudo 명령어 접근 관리 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-63(중) | 3. 서비스 관리 > 3.30 sudo 명령어 접근 관리 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /etc/sudoers 파일 소유자가 root이고, 파일 권한이 640인 경우" >> "$resultfile" 2>&1
 
   if [ ! -e /etc/sudoers ]; then
@@ -3454,7 +3406,6 @@ U_63() {
 
   return 0
 }
-
 
 U_65() {
     echo "" >> "$resultfile" 2>&1
@@ -3507,7 +3458,6 @@ U_65() {
     echo "※ U-65 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
     echo " NTP 서비스는 활성화되어 있으나, 서버 설정 또는 동기화 상태를 정상으로 확인하지 못했습니다." >> "$resultfile" 2>&1
 }
-
 
 U_66(){
   echo "" >> "$resultfile" 2>&1
@@ -3562,10 +3512,9 @@ U_66(){
   fi
 }
 
-
 U_67() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-67(중) | 5. 로그 관리 > 로그 디렉터리 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-67(중) | 5. 로그 관리 > 5.3 로그 디렉터리 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 로그 디렉터리(/var/log) 및 주요 로그 파일에 불필요한 쓰기 권한이 없는 경우" >> "$resultfile" 2>&1
 
   local target="/var/log"
