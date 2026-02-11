@@ -718,18 +718,27 @@ U_09() {
 }
 
 U_10() {
-	echo ""  >> $resultfile 2>&1
-	echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀"  >> $resultfile 2>&1
-	echo " 양호 판단 기준 : 동일한 UID로 설정된 사용자 계정이 존재하지 않는 경우" >> $resultfile 2>&1
-	if [ -f /etc/passwd ]; then
-    if [ "$(awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l)" -gt 0 ]; then
-			echo "※ U-10 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
-			echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> $resultfile 2>&1
-			return 0
-		fi
-	fi
-	echo "※ U-10 결과 : 양호(Good)" >> $resultfile 2>&1
-	return 0
+  echo "" >> "$resultfile" 2>&1
+  echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 동일한 UID로 설정된 사용자 계정이 존재하지 않는 경우" >> "$resultfile" 2>&1
+
+  vuln_flag=0
+
+  if [ -f /etc/passwd ]; then
+      dup_uid_count=$(awk -F: '{print $3}' /etc/passwd | sort | uniq -d | wc -l)
+
+      if [ "$dup_uid_count" -gt 0 ]; then
+          echo "※ U-10 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+          echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> "$resultfile" 2>&1
+          vuln_flag=1
+      fi
+  else
+      echo "※ /etc/passwd 파일이 존재하지 않습니다." >> "$resultfile" 2>&1
+      vuln_flag=1
+  fi
+  if [ "$vuln_flag" -eq 0 ]; then
+      echo "※ U-10 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  fi
 }
 
 U_11(){
@@ -1764,29 +1773,39 @@ U_30() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-30(중) | 2. 파일 및 디렉토리 관리 > 2.17 UMASK 설정 관리 ◀" >> "$resultfile" 2>&1
     echo " 양호 판단 기준 : UMASK 값이 022 이상으로 설정된 경우" >> "$resultfile" 2>&1
+
     vuln_flag=0
+    vuln_reason=""
     for svc in $(systemctl list-unit-files --type=service --no-legend | awk '{print $1}'); do
         umask_val=$(systemctl show "$svc" -p UMask 2>/dev/null | awk -F= '{print $2}')
         [ -z "$umask_val" ] && continue
-
         umask_dec=$((8#$umask_val))
         if [ "$umask_dec" -lt 18 ]; then
             vuln_flag=1
+            vuln_reason="systemd 서비스 [$svc]의 UMask 값($umask_val)이 022 미만입니다."
             break
         fi
     done
     if [ "$vuln_flag" -eq 0 ]; then
         if grep -q "pam_umask.so" /etc/pam.d/common-session 2>/dev/null; then
             login_umask=$(grep -E "^UMASK" /etc/login.defs 2>/dev/null | awk '{print $2}')
-            if [ -z "$login_umask" ] || [ $((8#$login_umask)) -lt 18 ]; then
+
+            if [ -z "$login_umask" ]; then
                 vuln_flag=1
+                vuln_reason="/etc/login.defs 파일에 UMASK 설정이 존재하지 않습니다."
+
+            elif [ $((8#$login_umask)) -lt 18 ]; then
+                vuln_flag=1
+                vuln_reason="/etc/login.defs 파일의 UMASK 값($login_umask)이 022 미만입니다."
             fi
         else
             vuln_flag=1
+            vuln_reason="PAM 설정에 pam_umask.so 모듈이 적용되어 있지 않습니다."
         fi
     fi
     if [ "$vuln_flag" -eq 1 ]; then
         echo "※ U-30 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+        echo " $vuln_reason" >> "$resultfile" 2>&1
     else
         echo "※ U-30 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
