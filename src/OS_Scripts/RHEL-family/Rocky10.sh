@@ -396,16 +396,7 @@ U_07() {
 U_08() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-08(중) | 1. 계정 관리 > 1.8 관리자 권한(그룹/ sudoers) 최소화 ◀"  >> "$resultfile" 2>&1
-  echo " 양호 판단 기준 : 관리자 권한(관리자 그룹 및 sudo 권한)에 불필요한 계정이 등록되어 있지 않은 경우" >> "$resultfile" 2>&1
-
-  # Rocky 10.x는 wheel + sudoers 기반이 핵심.
-  # gid=0(root 그룹) + wheel(존재 시) + sudoers에서 권한 부여된 사용자/그룹을 함께 점검한다.
-
-  local unnecessary_accounts=(
-    "daemon" "bin" "sys" "adm" "listen" "nobody" "nobody4" "noaccess" "diag"
-    "operator" "gopher" "games" "ftp" "apache" "httpd" "www-data"
-    "mysql" "mariadb" "postgres" "mail" "postfix" "news" "lp" "uucp" "nuucp"
-  )
+  echo " 양호 판단 기준 : 관리자 권한 범위에 root 외 계정이 존재하지 않는 경우" >> "$resultfile" 2>&1
 
   if [ ! -f /etc/group ]; then
     echo "※ U-08 결과 : N/A" >> "$resultfile" 2>&1
@@ -413,21 +404,12 @@ U_08() {
     return 0
   fi
 
-  _is_unnecessary() {
-    local u="$1" x
-    for x in "${unnecessary_accounts[@]}"; do
-      [ "$u" = "$x" ] && return 0
-    done
-    return 1
-  }
-
   _user_exists() { id "$1" >/dev/null 2>&1; }
   _group_exists() { getent group "$1" >/dev/null 2>&1; }
 
   # 특정 그룹의 구성원( /etc/group + /etc/gshadow(있으면) )을 모아 unique 출력
   _collect_group_users() {
     local g="$1" users="" line members
-
     line="$(getent group "$g" 2>/dev/null)"
     members="$(echo "$line" | awk -F: '{print $4}')"
     [ -n "$members" ] && users+="$members,"
@@ -449,19 +431,14 @@ U_08() {
     getent group | awk -F: '$3==0{print $1; exit}'
   }
 
-  # sudoers에서 사용자/그룹 추출:
-  # - "user ALL=(ALL) ..." 형태의 user
-  # - "%group ALL=(ALL) ..." 형태의 group
-  # - "includedir /etc/sudoers.d" 도 함께 반영
+  # sudoers에서 사용자/그룹 토큰 추출 (첫 토큰만)
   _collect_sudoers_identities() {
     local files=("/etc/sudoers")
     [ -d /etc/sudoers.d ] && files+=(/etc/sudoers.d/*)
 
-    # 파일이 없거나 glob이 비면 무시
     local f
     for f in "${files[@]}"; do
       [ -e "$f" ] || continue
-      # 주석/빈줄 제거, Defaults 제외, alias/Runas_Alias 등은 일단 제외(보수적으로)
       awk '
         BEGIN{IGNORECASE=1}
         /^[[:space:]]*#/ {next}
@@ -469,9 +446,6 @@ U_08() {
         /^[[:space:]]*Defaults/ {next}
         /^[[:space:]]*(User_Alias|Runas_Alias|Host_Alias|Cmnd_Alias)[[:space:]]+/ {next}
         {
-          # 첫 토큰이 %group 이거나 user
-          # 예: %wheel ALL=(ALL) ALL
-          # 예: alice ALL=(ALL) ALL
           gsub(/[[:space:]]+/, " ");
           split($0, a, " ");
           print a[1];
@@ -483,58 +457,65 @@ U_08() {
   local vuln_found=0
   local evidence=""
 
-  # 1) Rocky 10.x 핵심 관리자 그룹 후보 구성
+  # -----------------------------
+  # 1) 관리자 그룹 후보: gid=0 그룹 + wheel(존재 시)
+  # -----------------------------
   local admin_groups=()
   local gid0g
   gid0g="$(_gid0_group_name)"
   [ -n "$gid0g" ] && admin_groups+=("$gid0g")
   _group_exists "wheel" && admin_groups+=("wheel")
 
-  # 2) 그룹 구성원 점검 (gid0 + wheel)
+  # 그룹 구성원 중 root 외 계정 있으면 취약
   if [ "${#admin_groups[@]}" -gt 0 ]; then
-    local g u bads
+    local g u others=""
     for g in "${admin_groups[@]}"; do
-      bads=""
+      others=""
       while IFS= read -r u; do
         [ -z "$u" ] && continue
-        _is_unnecessary "$u" && bads+="$u "
+        [ "$u" = "root" ] && continue
+        _user_exists "$u" || continue
+        others+="$u "
       done < <(_collect_group_users "$g")
 
-      if [ -n "$bads" ]; then
+      if [ -n "$others" ]; then
         vuln_found=1
-        evidence+="[관리자그룹:${g}] 불필요 계정: ${bads}\n"
+        evidence+="[관리자그룹:${g}] root 외 계정: ${others}\n"
       fi
     done
   fi
 
-  # 3) sudoers 기반 관리자 권한 점검
-  # - sudoers에 직접 등록된 사용자
-  # - sudoers에 등록된 그룹(%group) -> 해당 그룹 구성원까지 확장
-  local sudo_id idtoken
+  # -----------------------------
+  # 2) sudoers 기반: root 외 sudo 권한 보유자 있으면 취약
+  #  - 사용자 직접 등록: alice ALL=(ALL) ALL  -> alice
+  #  - 그룹 등록: %wheel ALL=(ALL) ALL -> wheel 그룹 구성원(이미 위에서 잡히지만, wheel 말고 다른 그룹도 잡기 위함)
+  # -----------------------------
+  local idtoken
   while IFS= read -r idtoken; do
     [ -z "$idtoken" ] && continue
 
     if echo "$idtoken" | grep -q '^%'; then
-      # 그룹
       local sg="${idtoken#%}"
       if _group_exists "$sg"; then
-        local u bads=""
+        local u others=""
         while IFS= read -r u; do
           [ -z "$u" ] && continue
-          _is_unnecessary "$u" && bads+="$u "
+          [ "$u" = "root" ] && continue
+          _user_exists "$u" || continue
+          others+="$u "
         done < <(_collect_group_users "$sg")
 
-        if [ -n "$bads" ]; then
+        if [ -n "$others" ]; then
           vuln_found=1
-          evidence+="[sudoers그룹:%${sg}] 불필요 계정: ${bads}\n"
+          evidence+="[sudoers그룹:%${sg}] root 외 계정: ${others}\n"
         fi
       fi
     else
       # 사용자
       if _user_exists "$idtoken"; then
-        if _is_unnecessary "$idtoken"; then
+        if [ "$idtoken" != "root" ]; then
           vuln_found=1
-          evidence+="[sudoers사용자:${idtoken}] 불필요 계정이 sudo 권한 보유\n"
+          evidence+="[sudoers사용자:${idtoken}] root 외 계정이 sudo 권한 보유\n"
         fi
       fi
     fi
@@ -543,13 +524,11 @@ U_08() {
   # 결과 출력
   if [ "$vuln_found" -eq 1 ]; then
     echo "※ U-08 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " 관리자 권한(그룹/ sudoers)에 불필요한 계정이 포함되어 있습니다." >> "$resultfile" 2>&1
+    echo " 관리자 권한 범위(그룹/ sudoers)에 root 외 계정이 포함되어 있습니다." >> "$resultfile" 2>&1
     echo -e " 근거:\n${evidence}" >> "$resultfile" 2>&1
-    return 0
+  else
+    echo "※ U-08 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
-
-  echo "※ U-08 결과 : 양호(Good)" >> "$resultfile" 2>&1
-  echo " 관리자 권한(관리자 그룹 및 sudo 권한)에서 불필요 계정이 확인되지 않았습니다." >> "$resultfile" 2>&1
   return 0
 }
 
@@ -674,7 +653,7 @@ U_12() {
 
     # 점검 대상 파일(전역)
     local files=("/etc/profile" "/etc/bashrc" "/etc/profile.d" "/etc/csh.cshrc" "/etc/csh.login")
-    local f line
+    local f
     for f in "${files[@]}"; do
         if [[ -d "$f" ]]; then
             while IFS= read -r -d '' x; do
@@ -686,9 +665,10 @@ U_12() {
     # TMOUT 값 추출: 가장 마지막으로 설정된 값을 기준으로 기록(파일별)
     for f in "${files[@]}"; do
         [[ -r "$f" && -f "$f" ]] || continue
-        # 주석 제거 후 TMOUT=숫자 형태만 추출
         local tm
-        tm="$(grep -E '^[[:space:]]*(readonly[[:space:]]+)?TMOUT[[:space:]]*=' "$f" 2>/dev/null | sed 's/#.*$//' | tail -n 1 | sed -E 's/.*TMOUT[[:space:]]*=[[:space:]]*([0-9]+).*/\1/')"
+        tm="$(grep -E '^[[:space:]]*(readonly[[:space:]]+)?TMOUT[[:space:]]*=' "$f" 2>/dev/null \
+            | sed 's/#.*$//' | tail -n 1 \
+            | sed -E 's/.*TMOUT[[:space:]]*=[[:space:]]*([0-9]+).*/\1/')"
         if [[ "$tm" =~ ^[0-9]+$ ]]; then
             found+=("$f:$tm")
         fi
@@ -697,20 +677,33 @@ U_12() {
     if (( ${#found[@]} == 0 )); then
         vuln=1
         echo " [확인] TMOUT 설정을 전역 설정 파일에서 찾지 못했습니다." >> "$resultfile" 2>&1
-        echo " 조치 예: /etc/profile 등에 'readonly TMOUT=600; export TMOUT' 추가" >> "$resultfile" 2>&1
+        echo " 조치 예: /etc/profile 등에 'TMOUT=600; readonly TMOUT; export TMOUT' 추가" >> "$resultfile" 2>&1
     else
         echo " [확인] TMOUT 설정 발견:" >> "$resultfile" 2>&1
         local ok=0
+        local has_zero=0
+
         for e in "${found[@]}"; do
             echo "  - $e" >> "$resultfile" 2>&1
             local val="${e##*:}"
-            if [[ "$val" =~ ^[0-9]+$ ]] && (( val <= TARGET_TMOUT )); then
+
+            # TMOUT=0은 유휴세션 종료 비활성 -> 취약 처리
+            if [[ "$val" =~ ^[0-9]+$ ]] && (( val == 0 )); then
+                has_zero=1
+            fi
+
+            # 양호 조건: 1~TARGET_TMOUT
+            if [[ "$val" =~ ^[0-9]+$ ]] && (( val > 0 && val <= TARGET_TMOUT )); then
                 ok=1
             fi
         done
-        if (( ok == 0 )); then
+
+        if (( has_zero == 1 )); then
             vuln=1
-            echo " [판단] 설정값은 있으나 $TARGET_TMOUT 초 이하 조건을 충족하지 못했습니다." >> "$resultfile" 2>&1
+            echo " [판단] TMOUT=0 설정이 확인되었습니다(유휴 세션 종료 비활성) -> 취약" >> "$resultfile" 2>&1
+        elif (( ok == 0 )); then
+            vuln=1
+            echo " [판단] 설정값은 있으나 1~$TARGET_TMOUT 초 조건을 충족하지 못했습니다." >> "$resultfile" 2>&1
         fi
     fi
 
@@ -1308,87 +1301,134 @@ U_22() {
 U_23() {
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-23(상) | 2. 파일 및 디렉토리 관리 > 2.10 SUID, SGID, Sticky bit 설정 파일 점검 ◀"  >> "$resultfile" 2>&1
-  echo " 양호 판단 기준 : 주요 실행파일의 권한에 SUID와 SGID에 대한 설정이 부여되어 있지 않은 경우"  >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : 불필요하거나 비정상 경로에 SUID/SGID 설정 파일이 존재하지 않는 경우" >> "$resultfile" 2>&1
+  echo " 취약 판단 기준 : 사용자 쓰기 가능/비정상 경로(/tmp,/var/tmp,/home 등)에 SUID/SGID 파일 존재 또는 패키지 미소유 SUID/SGID 파일 존재" >> "$resultfile" 2>&1
 
-  # 점검 대상(가이드에서 지정한 주요 실행 파일)
-  local executables=(
-    "/sbin/dump"
-    "/sbin/restore"
-    "/sbin/unix_chkpwd"
-    "/usr/bin/at"
-    "/usr/bin/lpq" "/usr/bin/lpq-lpd"
-    "/usr/bin/lpr" "/usr/bin/lpr-lpd"
-    "/usr/bin/lprm" "/usr/bin/lprm-lpd"
-    "/usr/bin/newgrp"
-    "/usr/sbin/lpc" "/usr/sbin/lpc-lpd"
-    "/usr/sbin/traceroute"
-  )
+  # --- 환경에 따라 조절 ---
+  local SEARCH_ROOT="/"
+  local MAX_EVIDENCE=30
 
-  # ✅ 정상적으로 SUID/SGID가 존재할 수 있는(배포판 기본) 예외 목록
-  # - 환경에 따라 다를 수 있으니, 네 시스템에서 실제 기본값을 기준으로 조정
+  # ✅ 배포판 기본으로 존재할 수 있는 허용(화이트리스트)
+  # (너 시스템 기준으로 확장 가능)
   local whitelist=(
-    "/sbin/unix_chkpwd"
-    "/usr/bin/newgrp"
     "/usr/bin/passwd"
     "/usr/bin/sudo"
-    "/usr/bin/chsh"
-    "/usr/bin/chfn"
+    "/usr/bin/su"
+    "/usr/bin/newgrp"
     "/usr/bin/gpasswd"
+    "/usr/bin/chfn"
+    "/usr/bin/chsh"
+    "/usr/bin/mount"
+    "/usr/bin/umount"
+    "/usr/bin/crontab"
+    "/usr/sbin/unix_chkpwd"
+    "/usr/sbin/pam_timestamp_check"
+    "/usr/libexec/utempter/utempter"
+    "/usr/sbin/mount.nfs"
   )
 
-  # whitelist 포함 여부 함수
   _is_whitelisted() {
-    local file="$1"
+    local f="$1" w
     for w in "${whitelist[@]}"; do
-      if [ "$file" = "$w" ]; then
-        return 0
-      fi
+      [ "$f" = "$w" ] && return 0
     done
+    return 1
+  }
+
+  # 사용자 쓰기 가능 영역에 있으면 무조건 취약으로 보는 경로(강하게)
+  _is_bad_path() {
+    local f="$1"
+    case "$f" in
+      /tmp/*|/var/tmp/*|/dev/shm/*|/home/*|/run/user/*)
+        return 0 ;;
+    esac
     return 1
   }
 
   local vuln_found=0
   local warn_found=0
+  local evidence_vuln=""
+  local evidence_warn=""
+  local count_v=0
+  local count_w=0
 
-  for f in "${executables[@]}"; do
-    if [ -f "$f" ]; then
-      local oct_perm mode special
-      oct_perm="$(stat -c '%a' "$f" 2>/dev/null)"
-      mode="$(stat -c '%A' "$f" 2>/dev/null)"
-      [ -z "$oct_perm" ] && continue
+  # 1) 전체에서 SUID/SGID 파일 탐색 (가이드 실무형)
+  # - -xdev : 다른 파일시스템(/proc,/sys 등) 넘어가지 않음
+  # - -type f : 파일만
+  # - -perm -4000 : SUID
+  # - -perm -2000 : SGID
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
 
-      # 특수권한 자리(4xxx/2xxx/6xxx/7xxx) 추출
-      special="0"
-      if [ "${#oct_perm}" -eq 4 ]; then
-        special="${oct_perm:0:1}"
+    # 기본 정보
+    local mode owner group
+    mode="$(stat -c '%A' "$f" 2>/dev/null)"
+    owner="$(stat -c '%U' "$f" 2>/dev/null)"
+    group="$(stat -c '%G' "$f" 2>/dev/null)"
+    [ -z "$mode" ] && continue
+
+    # 1-A) 비정상/사용자 쓰기 가능 경로면 무조건 취약
+    if _is_bad_path "$f"; then
+      vuln_found=1
+      if (( count_v < MAX_EVIDENCE )); then
+        evidence_vuln+="  - $mode $owner:$group $f (BAD_PATH)\n"
+        count_v=$((count_v+1))
       fi
+      continue
+    fi
 
-      # SUID/SGID 여부: mode에 s/S가 있는지로 최종 확인
-      if [[ "$special" =~ [2467] ]] && [[ "$mode" =~ [sS] ]]; then
-        if _is_whitelisted "$f"; then
-          warn_found=1
-        else
-          vuln_found=1
+    # 1-B) 화이트리스트면 Warning(또는 양호 근거)
+    if _is_whitelisted "$f"; then
+      warn_found=1
+      if (( count_w < MAX_EVIDENCE )); then
+        evidence_warn+="  - $mode $owner:$group $f (WHITELIST)\n"
+        count_w=$((count_w+1))
+      fi
+      continue
+    fi
+
+    # 1-C) 패키지 소유 여부 확인 (미소유면 취약)
+    # rpm 기반(Rocky)에서 SUID/SGID가 패키지에 속하지 않으면 매우 의심
+    if command -v rpm >/dev/null 2>&1; then
+      if ! rpm -qf "$f" >/dev/null 2>&1; then
+        vuln_found=1
+        if (( count_v < MAX_EVIDENCE )); then
+          evidence_vuln+="  - $mode $owner:$group $f (NOT_OWNED_BY_RPM)\n"
+          count_v=$((count_v+1))
         fi
+        continue
       fi
     fi
-  done
 
-  # 최종 판정
-  if [ "$vuln_found" -eq 1 ]; then
+    # 1-D) 그 외는 “의심(Warning)”으로 분류 (환경 따라 취약으로 올려도 됨)
+    warn_found=1
+    if (( count_w < MAX_EVIDENCE )); then
+      evidence_warn+="  - $mode $owner:$group $f (CHECK)\n"
+      count_w=$((count_w+1))
+    fi
+
+  done < <(find "$SEARCH_ROOT" -xdev -type f \( -perm -4000 -o -perm -2000 \) 2>/dev/null)
+
+  # Sticky bit (/tmp,/var/tmp) 확인 (참고용)
+  local tmpperm vartmpperm
+  tmpperm="$(stat -c '%A' /tmp 2>/dev/null)"
+  vartmpperm="$(stat -c '%A' /var/tmp 2>/dev/null)"
+
+  # 2) 결과 출력
+  if (( vuln_found == 1 )); then
     echo "※ U-23 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " whitelist(예외) 외 주요 실행 파일에서 SUID/SGID 설정이 확인되었습니다. (위 근거 참고)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  if [ "$warn_found" -eq 1 ]; then
+    echo " [근거] 비정상/사용자쓰기가능 경로 또는 패키지 미소유 SUID/SGID 파일이 존재합니다." >> "$resultfile" 2>&1
+    [ -n "$evidence_vuln" ] && echo -e "$evidence_vuln" >> "$resultfile" 2>&1
+  else
     echo "※ U-23 결과 : 양호(Good)" >> "$resultfile" 2>&1
-    echo " SUID/SGID 설정이 일부 파일에서 확인되었으나, whitelist(기본값 가능)로 분류했습니다. (Warning 항목 참고)" >> "$resultfile" 2>&1
-    return 0
   fi
 
-  echo "※ U-23 결과 : 양호(Good)" >> "$resultfile" 2>&1
-  echo " 점검 대상 주요 실행 파일에서 SUID/SGID 설정이 확인되지 않았습니다." >> "$resultfile" 2>&1
+  if (( warn_found == 1 )); then
+    echo " [참고] SUID/SGID 파일이 존재하나, whitelist 또는 추가 확인 대상으로 분류했습니다." >> "$resultfile" 2>&1
+    [ -n "$evidence_warn" ] && echo -e "$evidence_warn" >> "$resultfile" 2>&1
+  fi
+
+  echo " [참고] /tmp 권한: ${tmpperm:-N/A}, /var/tmp 권한: ${vartmpperm:-N/A} (sticky bit 't' 확인)" >> "$resultfile" 2>&1
   return 0
 }
 
@@ -2580,9 +2620,7 @@ U_41(){
 U_42() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-42(상) | 3. 서비스 관리 > 3.9 불필요한 RPC 서비스 비활성화 ◀" >> "$resultfile" 2>&1
-    echo " 양호 판단 기준 : RPC 서비스(rpcbind 등)가 불필요하게 활성화되어 있지 않은 경우" >> "$resultfile" 2>&1
-
-    local vuln=0
+    echo " 양호 판단 기준 : rpcbind(RPC) 서비스가 비활성(미실행) 상태인 경우" >> "$resultfile" 2>&1
 
     local rpc_active=0
     if systemctl is-active rpcbind.service &>/dev/null || systemctl is-active rpcbind.socket &>/dev/null; then
@@ -2595,31 +2633,37 @@ U_42() {
         return 0
     fi
 
-    echo " [현황] rpcbind 서비스가 실행 중입니다." >> "$resultfile" 2>&1
-    systemctl --no-pager -l status rpcbind.service 2>/dev/null | head -n 10 >> "$resultfile" 2>&1
+    # --- 여기부터는 rpcbind가 켜져 있으면 무조건 취약 ---
+    echo " [현황] rpcbind 서비스가 실행(Active) 상태입니다." >> "$resultfile" 2>&1
+    systemctl --no-pager -l status rpcbind.service 2>/dev/null | head -n 12 >> "$resultfile" 2>&1
+    systemctl --no-pager -l status rpcbind.socket 2>/dev/null | head -n 12 >> "$resultfile" 2>&1
 
-    # 의존 서비스(NFS 등) 동작 여부로 "불필요" 판단 보조
-    local nfs_active=0
-    if systemctl is-active nfs-server.service &>/dev/null; then
-        nfs_active=1
+    # 포트 리스닝 근거 (111/tcp, 111/udp)
+    if command -v ss &>/dev/null; then
+        echo " [근거] RPC 포트(111) 리스닝 상태:" >> "$resultfile" 2>&1
+        ss -tulnp 2>/dev/null | awk 'NR==1 || $5 ~ /:111$/ || $5 ~ /:111,/' | head -n 30 >> "$resultfile" 2>&1
+        ss -tuln 2>/dev/null | grep -E '(:111\b)' | head -n 30 >> "$resultfile" 2>&1
     fi
 
+    # 의존 서비스 참고 출력 (예외 가능성만 기록)
+    if systemctl is-active nfs-server.service &>/dev/null; then
+        echo " [참고] nfs-server가 활성화되어 있어 rpcbind가 필요할 수 있습니다(업무 필요 시 예외 처리 가능)." >> "$resultfile" 2>&1
+    else
+        echo " [참고] nfs-server 비활성 상태입니다(rpcbind 불필요 가능성 높음)." >> "$resultfile" 2>&1
+    fi
+
+    # 등록 RPC 목록(가능하면)
     if command -v rpcinfo &>/dev/null; then
-        echo " [rpcinfo -p] 등록된 RPC 프로그램:" >> "$resultfile" 2>&1
-        rpcinfo -p 2>/dev/null | head -n 50 >> "$resultfile" 2>&1
+        echo " [rpcinfo -p] 등록된 RPC 프로그램(일부):" >> "$resultfile" 2>&1
+        rpcinfo -p 2>/dev/null | head -n 80 >> "$resultfile" 2>&1
     else
         echo " [참고] rpcinfo 명령이 없어 등록 RPC 목록 출력은 생략합니다." >> "$resultfile" 2>&1
     fi
 
-    if (( nfs_active == 1 )); then
-        echo " [판단 보조] nfs-server가 활성화되어 있어 rpcbind가 필요할 수 있습니다(업무 사용 여부 수동 확인 권고)." >> "$resultfile" 2>&1
-        echo "※ U-42 결과 : 양호(Good)" >> "$resultfile" 2>&1
-    else
-        vuln=1
-        echo " [판단] nfs-server 등 대표 의존 서비스가 비활성인데 rpcbind가 실행 중입니다." >> "$resultfile" 2>&1
-        echo " 조치 예: systemctl disable --now rpcbind.socket rpcbind.service" >> "$resultfile" 2>&1
-        echo "※ U-42 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    fi
+    echo " [판단] rpcbind(RPC) 서비스가 활성화되어 있어 불필요 서비스 실행 위험이 존재합니다." >> "$resultfile" 2>&1
+    echo " 조치 예: systemctl disable --now rpcbind.socket rpcbind.service" >> "$resultfile" 2>&1
+    echo "※ U-42 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    return 0
 }
 #연수
 U_43() {
