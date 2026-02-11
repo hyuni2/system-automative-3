@@ -393,9 +393,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_03() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-03(상) |1. 계정 관리| 계정 잠금 임계값 설정 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-03(상) | 1. 계정 관리 > 1.3 계정 잠금 임계값 설정 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 계정 잠금 임계값이 10회 이하의 값으로 설정되어 있는 경우"  >> "$resultfile" 2>&1
 
   local pam_files=(
@@ -478,14 +479,14 @@ U_03() {
   echo "※ U-03 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
-#연진
+
 U_04() {
 	echo ""  >> $resultfile 2>&1
 	echo "▶ U-04(상) | 1. 계정관리 > 1.4 패스워드 파일 보호 ◀"  >> $resultfile 2>&1
 	echo " 양호 판단 기준 : shadow 패스워드를 사용하거나, 패스워드를 암호화하여 저장하는 경우"  >> $resultfile 2>&1
 
     VULN_COUNT=$(awk -F : '$2 != "x" && $2 != "!!" && $2 != "*"' /etc/passwd | wc -l)
-    if [ "$VULN_COUNT" -gt 0 ]; then
+    if [ $VULN_COUNT -gt 0 ]; then
         VULN_USERS=$(awk -F : '$2 != "x" && $2 != "!!" && $2 != "*"' /etc/passwd | cut -d: -f1)
         echo "※ U-04 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
         echo " /etc/passwd 파일에 shadow 패스워드를 사용하지 않는 계정이 존재: $VULN_USERS" >> "$resultfile" 2>&1
@@ -503,7 +504,7 @@ U_05() {
     echo "▶ U-05(상) | 1. 계정관리 > 1.5 root 이외의 UID가 '0' 금지 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : root 계정과 동일한 UID를 갖는 계정이 존재하지 않는 경우" >> $resultfile 2>&1
     if [ -f /etc/passwd ]; then
-        if [ "$(awk -F : '$3==0 {print $1}' /etc/passwd | grep -vx 'root' | wc -l)" -gt 0 ]; then
+        if [ `awk -F : '$3==0 {print $1}' /etc/passwd | grep -vx 'root' | wc -l` -gt 0 ]; then
             echo "※ U-44 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
             echo " root 계정과 동일한 UID(0)를 갖는 계정이 존재합니다." >> $resultfile 2>&1
         else
@@ -549,6 +550,7 @@ U_06(){
         echo "※ U-06 결과 : 양호(Good)" >> $resultfile 2>&1
     fi 
 }
+
 U_07() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -834,9 +836,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_08() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-08(중) |1. 계정 관리| 관리자 그룹에 최소한의 계정 포함 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-08(중) | 1. 계정 관리 > 1.8 관리자 그룹에 최소한의 계정 포함 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 관리자 그룹에 불필요한 계정이 등록되어 있지 않은 경우" >> "$resultfile" 2>&1
 
   local admin_groups=("root" "wheel" "sudo" "admin")
@@ -914,10 +917,9 @@ U_08() {
   return 0
 }
 
-#연진
 U_09() {
 	echo ""  >> $resultfile 2>&1
-	echo "▶ U-09(하) | 1. 계정관리 > 1.12 계정이 존재하지 않는 GID 금지 ◀"  >> $resultfile 2>&1
+	echo "▶ U-09(하) | 1. 계정관리 > 1.9 계정이 존재하지 않는 GID 금지 ◀"  >> $resultfile 2>&1
 	echo " 양호 판단 기준 : 시스템 관리나 운용에 불필요한 그룹이 삭제 되어있는 경우" >> $resultfile 2>&1
 
 	USED_GIDS=$(awk -F: '{print $4}' /etc/passwd | sort -u)
@@ -938,18 +940,20 @@ U_09() {
         echo "※ U-09 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
 }
+
 U_10() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-10(중) | 1. 계정관리 > 1.10 동일한 UID 금지 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : 동일한 UID로 설정된 사용자 계정이 존재하지 않는 경우" >> $resultfile 2>&1
     if [ -f /etc/passwd ]; then
-        if [ "$(awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l)" -gt 0 ]; then
-            echo "※ U-10 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-            echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> "$resultfile" 2>&1
+        if [ `awk -F : '{print $3}' /etc/passwd | sort | uniq -d | wc -l` -gt 0 ]; then
+            echo "※ U-10 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
+            echo " 동일한 UID로 설정된 사용자 계정이 존재합니다." >> $resultfile 2>&1
         fi
     fi
-    echo "※ U-10 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo "※ U-10 결과 : 양호(Good)" >> $resultfile 2>&1
 }
+
 U_11(){
     echo "" >> $resultfile 2>&1
     echo "▶ U-11(하) | 1. 계정관리 > 1.11 사용자 shell 점검 ◀" >> $resultfile 2>&1
@@ -990,6 +994,7 @@ U_11(){
         echo "※ U-11 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
+
 U_12() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -1282,9 +1287,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_13() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-13(중) | 1. 계정관리 > 안전한 비밀번호 암호화 알고리즘 사용 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-13(중) | 1. 계정관리 > 1.13 안전한 비밀번호 암호화 알고리즘 사용 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : SHA-2 기반 알고리즘($5:SHA-256, $6:SHA-512)을 사용하는 경우" >> "$resultfile" 2>&1
 
   local shadow="/etc/shadow"
@@ -1348,7 +1354,7 @@ U_13() {
   echo "※ U-13 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
-#연진
+
 U_14() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-14(상) | 2. 파일 및 디렉토리 관리 > 2.1 root 홈, 패스 디렉터리 권한 및 패스 설정 ◀" >> "$resultfile" 2>&1
@@ -1407,6 +1413,7 @@ U_14() {
 
     return 0
 }
+
 U_15() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-15(상) | 2. 파일 및 디렉토리 관리 > 2.2 파일 및 디렉터리 소유자 설정 ◀"  >> $resultfile 2>&1
@@ -1418,6 +1425,7 @@ U_15() {
         echo "※ U-15 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
+
 U_16(){
     echo "" >> $resultfile 2>&1
     echo "▶ U-16(상) | 2. 파일 및 디렉토리 관리 > 2.3 /etc/passwd 파일 소유자 및 권한 설정 ◀" >> $resultfile 2>&1
@@ -1457,6 +1465,7 @@ U_16(){
     fi
 
 }
+
 U_17() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -1607,9 +1616,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_18() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-18(상) |2. 파일 및 디렉토리 관리| /etc/shadow 파일 소유자 및 권한 설정 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-18(상) | 2. 파일 및 디렉토리 관리 > 2.5 /etc/shadow 파일 소유자 및 권한 설정 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /etc/shadow 파일의 소유자가 root이고, 권한이 400인 경우"  >> "$resultfile" 2>&1
 
   local target="/etc/shadow"
@@ -1671,7 +1681,7 @@ U_18() {
   echo "※ U-18 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
-#연진
+
 U_19() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-19(상) | 2. 파일 및 디렉토리 관리 > 2.6 /etc/hosts 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
@@ -1711,6 +1721,7 @@ U_19() {
 
     return 0
 }
+
 U_20() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-20(상) | 2. 파일 및 디렉토리 관리 > 2.7 systemd *.socket, *.service 파일 소유자 및 권한 설정 ◀"  >> $resultfile 2>&1
@@ -1759,6 +1770,7 @@ U_20() {
         echo "※ U-20 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
+
 U_21(){
   echo ""  >> "$resultfile" 2>&1
   echo "▶ U-21(상) | 2. 파일 및 디렉토리 관리 > 2.8 /etc/(r)syslog.conf 파일 소유자 및 권한 설정 ◀"  >> "$resultfile" 2>&1
@@ -1800,6 +1812,7 @@ U_21(){
   echo " $target 파일의 소유자($OWNER) 및 권한($PERMIT)이 기준에 적합합니다." >> "$resultfile" 2>&1
 
 }
+
 U_22() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -1914,9 +1927,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_23() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-23(상) |2. 파일 및 디렉토리 관리| SUID, SGID, Sticky bit 설정 파일 점검 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-23(상) | 2. 파일 및 디렉토리 관리 > 2.10 SUID, SGID, Sticky bit 설정 파일 점검 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 주요 실행파일의 권한에 SUID와 SGID에 대한 설정이 부여되어 있지 않은 경우"  >> "$resultfile" 2>&1
 
   local executables=(
@@ -1993,7 +2007,7 @@ U_23() {
   echo " 점검 대상 주요 실행 파일에서 SUID/SGID 설정이 확인되지 않았습니다." >> "$resultfile" 2>&1
   return 0
 }
-#연진
+
 U_24() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-24(상) | 2. 파일 및 디렉토리 관리 > 2.11 사용자, 시스템 시작파일 및 환경파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
@@ -2044,20 +2058,22 @@ U_24() {
         echo "※ U-24 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
 }
+
 U_25() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-25(상) | 2. 파일 및 디렉토리 관리 > 2.12 world writable 파일 점검 ◀"  >> $resultfile 2>&1
     echo " 양호 판단 기준 : world writable 파일이 존재하지 않거나, 존재 시 설정 이유를 인지하고 있는 경우"  >> $resultfile 2>&1
-    if [ "$(find / -type f -perm -2 2>/dev/null | wc -l)" -gt 0 ]; then
+    if [ `find / -type f -perm -2 2>/dev/null | wc -l` -gt 0 ]; then
         echo "※ U-25 결과 : 취약(Vulnerable)" >> $resultfile 2>&1
         echo " world writable 설정이 되어있는 파일이 있습니다." >> $resultfile 2>&1
     else
         echo "※ U-25 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
+
 U_26(){
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-26(상) | 2. 파일 및 디렉토리 관리 > /dev에 존재하지 않는 device 파일 점검 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-26(상) | 2. 파일 및 디렉토리 관리 > 2.13 /dev에 존재하지 않는 device 파일 점검 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /dev 디렉터리에 대한 파일 점검 후 존재하지 않는 device 파일을 제거한 경우" >> "$resultfile" 2>&1
 
   local target_dir="/dev"
@@ -2085,6 +2101,7 @@ U_26(){
         echo "※ U-26 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+
 U_27() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -2343,9 +2360,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_28() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-28(상) | 2. 파일 및 디렉토리 관리 > 접속 IP 및 포트 제한 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-28(상) | 2. 파일 및 디렉토리 관리 > 2.15 접속 IP 및 포트 제한 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 접속을 허용할 특정 호스트에 대한 IP 주소 및 포트 제한을 설정한 경우" >> "$resultfile" 2>&1
 
   local deny="/etc/hosts.deny"
@@ -2419,7 +2437,7 @@ U_28() {
   echo " 기본 차단 정책(ALL:ALL)이 적용되어 있으며 전체 허용 설정이 없습니다." >> "$resultfile" 2>&1
   return 0
 }
-#연진
+
 U_29() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-29(하) | 2. 파일 및 디렉토리 관리 > 2.16 hosts.lpd 파일 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
@@ -2454,6 +2472,7 @@ U_29() {
         echo "※ U-29 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
 }
+
 U_30() {
     echo "" >> $resultfile 2>&1
     echo "▶ U-30(중) | 2. 파일 및 디렉토리 관리 > 2.17 UMASK 설정 관리 ◀"  >> $resultfile 2>&1
@@ -2618,6 +2637,7 @@ U_30() {
     done
     echo "※ U-30 결과 : 양호(Good)" >> $resultfile 2>&1
 }
+
 U_31() {
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-31(중) | 2. 파일 및 디렉토리 관리 > 2.18 홈 디렉토리 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
@@ -2659,6 +2679,7 @@ U_31() {
     echo "※ U-31 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+
 U_32() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -2790,9 +2811,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_33() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-33(하) |2. 파일 및 디렉토리 관리 > 숨겨진 파일 및 디렉토리 검색 및 제거 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-33(하) | 2. 파일 및 디렉토리 관리 > 2.20 숨겨진 파일 및 디렉토리 검색 및 제거 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 불필요하거나 의심스러운 숨겨진 파일 및 디렉터리를 삭제한 경우" >> "$resultfile" 2>&1
 
   ALL_HIDDEN=$(find / \
@@ -2826,7 +2848,7 @@ U_33() {
 
   return 0
 }
-#연진
+
 U_34() {
     echo "" >> "$resultfile" 2>&1
     echo "▶ U-34(상) | 3. 서비스 관리 > 3.1 Finger 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -2866,6 +2888,7 @@ U_34() {
         echo "※ U-34 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
 } # [수정] 맨 마지막에 있던 불필요한 fi 제거
+
 U_35() {
     vuln_flag=0
     evidence_flag=0
@@ -3055,6 +3078,7 @@ U_35() {
         echo "※ U-35 결과 : 양호(Good)" >> "$resultfile" 2>&1
     fi
 }
+
 U_36(){
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-36(상) | 3. 서비스 관리 > 3.3 r 계열 서비스 비활성화 ◀" >> "$resultfile" 2>&1
@@ -3094,6 +3118,7 @@ U_36(){
     echo "※ U-36 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+
 U_37() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -3444,9 +3469,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_38() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-38(상) |3. 서비스 관리 | DoS 공격에 취약한 서비스 비활성화 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-38(상) | 3. 서비스 관리 > 3.5 DoS 공격에 취약한 서비스 비활성화 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : (1) 해당 서비스를 사용하지 않는 경우 N/A, (2) DoS 공격에 취약한 서비스가 비활성화된 경우" >> "$resultfile" 2>&1
 
   local in_scope_active=0     # 점검 대상 서비스가 실제로 '활성'인지 (N/A 판단용)
@@ -3560,10 +3586,10 @@ U_38() {
 
   return 0
 }
-#연진
+
 U_39() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-39(상) |3. 서비스 관리 > 불필요한 NFS 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-39(상) | 3. 서비스 관리 > 3.6 불필요한 NFS 서비스 비활성화 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 불필요한 NFS 서비스 관련 데몬이 비활성화 되어 있는 경우" >> "$resultfile" 2>&1
 
   local found=0
@@ -3622,6 +3648,7 @@ U_39() {
   echo "※ U-39 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
+
 U_40() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-40(상) | 3. 서비스 관리 > 3.7 NFS 접근 통제 ◀"  >> $resultfile 2>&1
@@ -3650,6 +3677,7 @@ U_40() {
         echo "※ U-40 결과 : 양호(Good)" >> $resultfile 2>&1
     fi
 }
+
 U_41(){
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-41(상) | 3. 서비스 관리 > 3.8 불필요한 automountd 제거 ◀" >> "$resultfile" 2>&1
@@ -3677,6 +3705,7 @@ U_41(){
     echo "※ U-41 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+
 U_42() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -3756,9 +3785,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_43() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-43(상) |3. 서비스 관리 > NIS, NIS+ 점검 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-43(상) | 3. 서비스 관리 > 3.10 NIS, NIS+ 점검 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : (1) NIS 서비스를 사용하지 않는 경우 N/A, (2) 사용 시 NIS 서비스 비활성화 또는 불가피 시 NIS+ 사용" >> "$resultfile" 2>&1
 
   local mail_like_na=0   # N/A 여부 (여기서는 nis_in_use의 반대 개념)
@@ -3830,10 +3860,10 @@ U_43() {
   fi
   return 0
 }
-#연진
+
 U_44() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-44(상) | UNIX > 3. 서비스 관리 > tftp, talk 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-44(상) | 3. 서비스 관리 > 3.11 tftp, talk 서비스 비활성화 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : tftp, talk, ntalk 서비스가 비활성화 되어 있는 경우" >> "$resultfile" 2>&1
 
   local services=("tftp" "talk" "ntalk")
@@ -3886,87 +3916,7 @@ U_44() {
   echo " tftp/talk/ntalk 서비스가 systemd/xinetd/inetd 설정에서 모두 비활성 상태입니다." >> "$resultfile" 2>&1
   return 0
 }
-#연진
-U_49() {
-  echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-49(상) |3. 서비스 관리 > DNS 보안 버전 패치 ◀" >> "$resultfile" 2>&1
-  echo " 양호 판단 기준 : DNS 서비스를 사용하지 않거나 주기적으로 패치를 관리하고 있는 경우" >> "$resultfile" 2>&1
 
-  local named_active=0
-  local named_running=0
-  local bind_ver=""
-  local major="" minor="" patch=""
-  local evidence=""
-
-  # 1) DNS 서비스 사용 여부 (named)
-  if command -v systemctl >/dev/null 2>&1; then
-    if systemctl is-active --quiet named 2>/dev/null; then
-      named_active=1
-    fi
-  fi
-  if ps -ef 2>/dev/null | grep -i 'named' | grep -v grep >/dev/null 2>&1; then
-    named_running=1
-  fi
-
-  # 서비스 미사용이면 양호
-  if [ "$named_active" -eq 0 ] && [ "$named_running" -eq 0 ]; then
-    echo "※ U-49 결과 : 양호(Good)" >> "$resultfile" 2>&1
-    echo " DNS 서비스(named)가 비활성/미사용 상태입니다." >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  # 2) BIND 버전 확인 (named -v 우선)
-  if command -v named >/dev/null 2>&1; then
-    bind_ver="$(named -v 2>/dev/null | grep -Eo '([0-9]+\.){2}[0-9]+' | head -n 1)"
-  fi
-
-  # named -v로 못 얻으면 패키지에서 추출
-  if [ -z "$bind_ver" ]; then
-    if command -v rpm >/dev/null 2>&1; then
-      bind_ver="$(rpm -q bind 2>/dev/null | grep -Eo '([0-9]+\.){2}[0-9]+' | head -n 1)"
-    fi
-  fi
-
-  if [ -z "$bind_ver" ]; then
-    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " named는 동작 중이나 BIND 버전을 확인하지 못했습니다. (named -v / rpm -q bind 실패)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  major="$(echo "$bind_ver" | awk -F. '{print $1}')"
-  minor="$(echo "$bind_ver" | awk -F. '{print $2}')"
-  patch="$(echo "$bind_ver" | awk -F. '{print $3}')"
-
-  # 3) 판정 (9.18.7 이상이면 양호 / 9.19+는 개발/테스트로 간주 -> 취약 처리)
-  if [ "$major" -ne 9 ]; then
-    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " BIND 메이저 버전이 9가 아닙니다. (현재: $bind_ver)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  if [ "$minor" -ge 19 ]; then
-    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " BIND $bind_ver 는 9.19+ (개발/테스트 버전으로 간주) 입니다. 운영 권고 버전(9.18.7 이상)으로 관리 필요." >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  if [ "$minor" -lt 18 ]; then
-    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " BIND 버전이 9.18 미만입니다. (현재: $bind_ver, 기준: 9.18.7 이상)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  # minor == 18 인 경우 patch 비교
-  if [ "$patch" -lt 7 ]; then
-    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
-    echo " BIND 버전이 최신 버전(9.18.7 이상)이 아닙니다. (현재: $bind_ver)" >> "$resultfile" 2>&1
-    return 0
-  fi
-
-  echo "※ U-49 결과 : 양호(Good)" >> "$resultfile" 2>&1
-  echo " DNS 서비스 사용 중이며 BIND 버전이 기준 이상입니다. (현재: $bind_ver)" >> "$resultfile" 2>&1
-  return 0
-}
 U_45() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-45(상) | 3. 서비스 관리 > 3.12 메일 서비스 버전 점검 ◀"  >> $resultfile 2>&1
@@ -4002,6 +3952,7 @@ U_45() {
     fi
     echo "※ U-45 결과 : 양호(Good)" >> $resultfile 2>&1
 }
+
 U_46(){
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-46(상) | 3. 서비스 관리 > 3.13 일반 사용자의 메일 서비스 실행 방지 ◀" >> "$resultfile" 2>&1
@@ -4032,6 +3983,7 @@ U_46(){
     echo "※ U-46 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+
 U_47() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -4361,9 +4313,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_48() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-48(중) |3. 서비스 관리 > expn, vrfy 명령어 제한 ◀"  >> "$resultfile" 2>&1
+  echo "▶ U-48(중) | 3. 서비스 관리 > 3.15 expn, vrfy 명령어 제한 ◀"  >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : (1) 메일 서비스를 사용하지 않는 경우 N/A, (2) 사용 시 noexpn, novrfy 옵션(또는 goaway)이 설정된 경우" >> "$resultfile" 2>&1
 
   local mail_in_use=0
@@ -4498,6 +4451,88 @@ U_48() {
   fi
   return 0
 }
+
+U_49() {
+  echo ""  >> "$resultfile" 2>&1
+  echo "▶ U-49(상) | 3. 서비스 관리 > 3.16 DNS 보안 버전 패치 ◀" >> "$resultfile" 2>&1
+  echo " 양호 판단 기준 : DNS 서비스를 사용하지 않거나 주기적으로 패치를 관리하고 있는 경우" >> "$resultfile" 2>&1
+
+  local named_active=0
+  local named_running=0
+  local bind_ver=""
+  local major="" minor="" patch=""
+  local evidence=""
+
+  # 1) DNS 서비스 사용 여부 (named)
+  if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet named 2>/dev/null; then
+      named_active=1
+    fi
+  fi
+  if ps -ef 2>/dev/null | grep -i 'named' | grep -v grep >/dev/null 2>&1; then
+    named_running=1
+  fi
+
+  # 서비스 미사용이면 양호
+  if [ "$named_active" -eq 0 ] && [ "$named_running" -eq 0 ]; then
+    echo "※ U-49 결과 : 양호(Good)" >> "$resultfile" 2>&1
+    echo " DNS 서비스(named)가 비활성/미사용 상태입니다." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # 2) BIND 버전 확인 (named -v 우선)
+  if command -v named >/dev/null 2>&1; then
+    bind_ver="$(named -v 2>/dev/null | grep -Eo '([0-9]+\.){2}[0-9]+' | head -n 1)"
+  fi
+
+  # named -v로 못 얻으면 패키지에서 추출
+  if [ -z "$bind_ver" ]; then
+    if command -v rpm >/dev/null 2>&1; then
+      bind_ver="$(rpm -q bind 2>/dev/null | grep -Eo '([0-9]+\.){2}[0-9]+' | head -n 1)"
+    fi
+  fi
+
+  if [ -z "$bind_ver" ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " named는 동작 중이나 BIND 버전을 확인하지 못했습니다. (named -v / rpm -q bind 실패)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  major="$(echo "$bind_ver" | awk -F. '{print $1}')"
+  minor="$(echo "$bind_ver" | awk -F. '{print $2}')"
+  patch="$(echo "$bind_ver" | awk -F. '{print $3}')"
+
+  # 3) 판정 (9.18.7 이상이면 양호 / 9.19+는 개발/테스트로 간주 -> 취약 처리)
+  if [ "$major" -ne 9 ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " BIND 메이저 버전이 9가 아닙니다. (현재: $bind_ver)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  if [ "$minor" -ge 19 ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " BIND $bind_ver 는 9.19+ (개발/테스트 버전으로 간주) 입니다. 운영 권고 버전(9.18.7 이상)으로 관리 필요." >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  if [ "$minor" -lt 18 ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " BIND 버전이 9.18 미만입니다. (현재: $bind_ver, 기준: 9.18.7 이상)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  # minor == 18 인 경우 patch 비교
+  if [ "$patch" -lt 7 ]; then
+    echo "※ U-49 결과 : 취약(Vulnerable)" >> "$resultfile" 2>&1
+    echo " BIND 버전이 최신 버전(9.18.7 이상)이 아닙니다. (현재: $bind_ver)" >> "$resultfile" 2>&1
+    return 0
+  fi
+
+  echo "※ U-49 결과 : 양호(Good)" >> "$resultfile" 2>&1
+  echo " DNS 서비스 사용 중이며 BIND 버전이 기준 이상입니다. (현재: $bind_ver)" >> "$resultfile" 2>&1
+  return 0
+}
+
 U_50() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-50(상) | 3. 서비스 관리 > 3.17 DNS Zone Transfer 설정 ◀"  >> $resultfile 2>&1
@@ -4514,6 +4549,7 @@ U_50() {
     fi
     echo "※ U-50 결과 : 양호(Good)" >> $resultfile 2>&1
 }
+
 U_51(){
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-51(중) | 3. 서비스 관리 > 3.18 DNS 서비스의 취약한 동적 업데이트 설정 금지 ◀" >> "$resultfile" 2>&1
@@ -4561,6 +4597,7 @@ U_51(){
     echo "※ U-51 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+
 U_52() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -4816,9 +4853,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_53() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-53(하) |3. 서비스 관리 > FTP 서비스 정보 노출 제한 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-53(하) | 3. 서비스 관리 > 3.20 FTP 서비스 정보 노출 제한 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : FTP 접속 배너에 노출되는 정보가 없는 경우" >> "$resultfile" 2>&1
 
   local listen_info=""
@@ -4905,10 +4943,10 @@ U_53() {
 
   return 0
 }
-#연진
+
 U_54() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-54(중) |3. 서비스 관리 > 암호화되지 않는 FTP 서비스 비활성화 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-54(중) | 3. 서비스 관리 > 3.21 암호화되지 않는 FTP 서비스 비활성화 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 암호화되지 않은 FTP 서비스가 비활성화된 경우" >> "$resultfile" 2>&1
 
   local ftp_active=0
@@ -4966,6 +5004,7 @@ U_54() {
   echo "※ U-54 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
+
 U_55() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-55(중) | 3. 서비스 관리 > 3.22 FTP 계정 Shell 제한 ◀" >> $resultfile 2>&1
@@ -4998,6 +5037,7 @@ U_55() {
         echo " ftp 계정에 /bin/false 또는 nologin 쉘이 부여되어 있습니다." >> $resultfile 2>&1
     fi
 }
+
 U_56(){
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-56(하) | 3. 서비스 관리 > 3.23 FTP 서비스 접근 제어 설정 ◀" >> "$resultfile" 2>&1
@@ -5061,6 +5101,7 @@ U_56(){
     echo "※ U-56 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+
 U_57() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -5496,9 +5537,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_58() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-58(중) |3. 서비스 관리 > 불필요한 SNMP 서비스 구동 점검 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-58(중) | 3. 서비스 관리 > 3.25 불필요한 SNMP 서비스 구동 점검 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : SNMP 서비스를 사용하지 않는 경우" >> "$resultfile" 2>&1
 
   local found=0
@@ -5548,10 +5590,10 @@ U_58() {
 
   return 0
 }
-#연진
+
 U_59() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-59(상) |3. 서비스 관리 > 안전한 SNMP 버전 사용 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-59(상) | 3. 서비스 관리 > 3.26 안전한 SNMP 버전 사용 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : SNMP 서비스를 v3 이상으로 사용하는 경우" >> "$resultfile" 2>&1
 
   local snmpd_conf="/etc/snmp/snmpd.conf"
@@ -5643,6 +5685,7 @@ U_59() {
   echo " snmpd는 활성 상태이나 SNMPv3 필수 설정이 미흡합니다. (createUser(SHA+AES) 또는 rouser/rwuser 미확인)" >> "$resultfile" 2>&1
   return 0
 }
+
 U_60() {
     echo ""  >> $resultfile 2>&1
     echo " ▶ U-60(중) | 3. 서비스 관리 > 3.27 SNMP Community String 복잡성 설정 ◀"  >> $resultfile 2>&1
@@ -5724,6 +5767,7 @@ U_60() {
         echo " SNMP Community String이 복잡성 기준을 만족합니다." >> $resultfile 2>&1
     fi
 }
+
 U_61(){
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-61(상) | 3. 서비스 관리 > 3.28 SNMP Access Control 설정 ◀" >> "$resultfile" 2>&1
@@ -5773,6 +5817,7 @@ U_61(){
     echo "※ U-61 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi
 }
+
 U_62() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -6258,9 +6303,10 @@ if [[ "$_status" == "GOOD" ]]; then
   rm -f "$_tmp"
     return 0
 }
+
 U_63() {
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-63(중) |3. 서비스 관리 > sudo 명령어 접근 관리 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-63(중) | 3. 서비스 관리 > 3.30 sudo 명령어 접근 관리 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /etc/sudoers 파일 소유자가 root이고, 파일 권한이 640인 경우" >> "$resultfile" 2>&1
 
   if [ ! -e /etc/sudoers ]; then
@@ -6290,10 +6336,10 @@ U_63() {
 
   return 0
 }
-#연진
+
 U_64() {
   echo ""  >> "$resultfile" 2>&1
-  echo "▶ U-64(상) |4. 패치 관리 > 주기적 보안 패치 및 벤더 권고사항 적용 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-64(상) | 4. 패치 관리 > 4.1 주기적 보안 패치 및 벤더 권고사항 적용 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : 패치 적용 정책을 수립하여 주기적으로 패치관리를 수행하고 최신 보안 패치 및 Kernel이 적용된 경우" >> "$resultfile" 2>&1
 
   local os_name="" os_ver=""
@@ -6353,6 +6399,7 @@ U_64() {
   echo "※ U-64 결과 : 양호(Good)" >> "$resultfile" 2>&1
   return 0
 }
+
 U_65() {
     echo ""  >> $resultfile 2>&1
     echo "▶ U-65(중) | 5. 로그 관리 > 5.1 NTP 및 시각 동기화 설정 ◀"  >> $resultfile 2>&1
@@ -6465,6 +6512,7 @@ U_65() {
         fi
     fi
 }
+
 U_66(){
   echo "" >> "$resultfile" 2>&1
   echo "▶ U-66(중) | 5. 로그 관리 > 5.2 정책에 따른 시스템 로깅 설정 ◀" >> "$resultfile" 2>&1
@@ -6517,6 +6565,7 @@ U_66(){
       echo "※ U-66 결과 : 양호(Good)" >> "$resultfile" 2>&1
   fi 
 }
+
 U_67() {
   local _tmp _rc
   _tmp="$(mktemp)"
@@ -6637,7 +6686,7 @@ U_67() {
   _rc=$?
 
   echo "" >> "$resultfile" 2>&1
-  echo "▶ U-67(중) | 4. 로그 관리 > 로그 디렉터리 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
+  echo "▶ U-67(중) | 5. 로그 관리 > 5.3 로그 디렉터리 소유자 및 권한 설정 ◀" >> "$resultfile" 2>&1
   echo " 양호 판단 기준 : /var/log 및 관련 로그 파일 소유자가 root이고 권한이 644 이하인 경우" >> "$resultfile" 2>&1
   local _status=""
   local _line=""
