@@ -707,14 +707,41 @@ elif st.session_state.page == "history":
             st.info("저장된 진단 기록이 없습니다.")
         else:
             for f in files:
-                with open(f, "rb") as file_data:
-                    st.download_button(
-                        label=f"📄 {f.name}",
-                        data=file_data,
-                        file_name=f.name,
-                        mime="text/csv",
-                        key=f"download_{f.name}"
-                    )
+                # 가로 칸 나누기 (파일명/다운로드 8 : 삭제 버튼 2)
+                col_file, col_del = st.columns([8, 2])
+                
+                with col_file:
+                    with open(f, "rb") as file_data:
+                        st.download_button(
+                            label=f"📄 {f.name}",
+                            data=file_data,
+                            file_name=f.name,
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            key=f"download_{f.name}",
+                            use_container_width=True
+                        )
+                
+                with col_del:
+                    # 개별 삭제 버튼
+                    if st.button("🗑️ 삭제", key=f"del_{f.name}", use_container_width=True):
+                        import os
+                        
+                        # 1. history 폴더의 .docx 삭제
+                        if f.exists():
+                            f.unlink()
+                        
+                        # 2. reports 폴더의 연동된 .txt 삭제
+                        # 파일명 규칙에 따라 매칭 (예: IP_result.docx -> IP_result.txt)
+                        txt_filename = f.name.replace(".docx", ".txt")
+                        txt_file = REPORTS_DIR / txt_filename
+                        
+                        if txt_file.exists():
+                            txt_file.unlink()
+                            st.success(f"{f.name} 및 리포트 삭제 완료")
+                        else:
+                            st.warning(f"워드 파일은 삭제되었으나, {txt_filename} 파일을 찾을 수 없습니다.")
+                        
+                        st.rerun() # 화면 새로고침
     # ===============================
     # FLEX SPACER (footer 밀어내기)
     # ===============================
