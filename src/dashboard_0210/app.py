@@ -19,8 +19,9 @@ from reportlab.lib import colors
 from reportlab.lib.units import cm
 from datetime import datetime
 
-BASE_DIR = Path(__file__).parent
-IMAGES_DIR = BASE_DIR / "images"
+BASE_DIR = Path(__file__).resolve().parent
+REPORTS_DIR = BASE_DIR / "reports"
+HISTORY_DIR = BASE_DIR / "history"IMAGES_DIR = BASE_DIR / "images"
 CURRENT_DIR = BASE_DIR
 def save_df_to_docx(df: pd.DataFrame, save_path, target_ip: str):
     doc = Document()
