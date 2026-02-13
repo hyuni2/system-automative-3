@@ -772,13 +772,37 @@ elif st.session_state.page == "check":
                     if parsed_results:
                         df = pd.DataFrame(parsed_results)
                         df = df[["코드", "중요도", "항목", "상태", "상세 사유"]]
+
+                        df = df[df["코드"].notna()]
+
+                        df["STATUS_ORDER"] = df["상태"].apply(
+                            lambda x: 0 if "취약" in str(x) else 1
+                        )
+
+                        df["U_NUM"] = df["코드"].str.extract(r'U-(\d+)').astype(int)
+
+                        df = df.sort_values(
+                            by=["STATUS_ORDER", "U_NUM"],
+                            ascending=[True, True]
+                        )
+
+                        df = df.drop(columns=["STATUS_ORDER", "U_NUM"])
+                        df = df.reset_index(drop=True)
+
                         st.session_state["latest_result_df"] = df
 
-                        # 데이터프레임 출력
+                        def highlight_vulnerable(row):
+                            if "취약" in str(row["상태"]):
+                                return ["background-color: #ffe6e1"] * len(row)
+                            return [""] * len(row)
+
                         st.dataframe(
                             df.style
-                                .map(lambda x: "color:red" if "취약" in str(x) else "color:green", subset=["상태"])
-                                .map(lambda x: "color:red" if x == "상" else "color:orange", subset=["중요도"]),
+                                .apply(highlight_vulnerable, axis=1)   # 행 배경
+                                .map(lambda x: "color:red; font-weight:bold;" if "취약" in str(x) else "color:green;",
+                                    subset=["상태"])
+                                .map(lambda x: "color:red;" if x == "상" else "color:orange;",
+                                    subset=["중요도"]),
                             use_container_width=True,
                             height=420
                         )
