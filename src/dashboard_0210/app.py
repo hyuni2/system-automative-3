@@ -593,6 +593,7 @@ elif st.session_state.page == "check":
                                 data = json.loads(line)
                                 parsed_results.append({
                                     "코드": data.get("code"),
+                                    "중요도": data.get("severity"),
                                     "항목": data.get("item"),
                                     "상태": data.get("status"),
                                     "상세 사유": data.get("reason"),
@@ -600,15 +601,23 @@ elif st.session_state.page == "check":
 
                     if parsed_results:
                         df = pd.DataFrame(parsed_results)
+                        df = df[["코드", "중요도", "항목", "상태", "상세 사유"]]
                         st.session_state["latest_result_df"] = df
+
                         st.dataframe(
-                            df.style.map(
-                                lambda x: "color:red" if "취약" in x else "color:green",
-                                subset=["상태"]
-                            ),
+                            df.style
+                                .map(
+                                    lambda x: "color:red" if "취약" in x else "color:green",
+                                    subset=["상태"]
+                                )
+                                .map(
+                                    lambda x: "color:red" if x == "상" else "color:orange",
+                                    subset=["중요도"]
+                                ),
                             use_container_width=True,
                             height=420
                         )
+
                         from datetime import datetime
 
                         HISTORY_DIR = CURRENT_DIR / "history"
