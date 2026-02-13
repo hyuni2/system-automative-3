@@ -510,13 +510,28 @@ elif st.session_state.page == "check":
     st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
 
     # ===============================
-    # INPUT FORM (좁게 유지)
+    # INPUT FORM (탭 적용: 개별 입력 vs CSV 업로드)
     # ===============================
     _, center, _ = st.columns([1, 3, 1])
     with center:
-        target_ip = st.text_input("대상 서버 IP", placeholder="192.168.x.x")
-        ssh_user = st.text_input("SSH 계정", value="")
-        ssh_pw = st.text_input("SSH 비밀번호", type="password")
+        # 탭 디자인 생성
+        tab1, tab2 = st.tabs(["🎯 개별 서버 진단", "📁 대량 서버 진단 (CSV)"])
+
+        with tab1:
+            target_ip = st.text_input("대상 서버 IP", placeholder="192.168.x.x", key="single_ip")
+            ssh_user = st.text_input("SSH 계정", value="", key="single_user")
+            ssh_pw = st.text_input("SSH 비밀번호", type="password", key="single_pw")
+            uploaded_file = None # 탭1일 때는 업로드 파일 무시
+
+        with tab2:
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+            uploaded_file = st.file_uploader("서버 목록 CSV 업로드 (필수: ip, user, pw)", type=["csv"], key="bulk_upload")
+            if uploaded_file:
+                try:
+                    df_targets = pd.read_csv(uploaded_file, encoding='utf-8-sig')
+                    st.dataframe(df_targets, use_container_width=True, height=150)
+                except Exception as e:
+                    st.error(f"CSV 읽기 실패: {e}")
 
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
         start_btn = st.button("🚀 진단 시작", use_container_width=True)
@@ -527,31 +542,39 @@ elif st.session_state.page == "check":
 
     st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
     st.divider()
-    st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
 
     # ===============================
-    # EXECUTE DIAGNOSIS
+    # EXECUTE DIAGNOSIS (통합 처리 로직)
     # ===============================
-
     _, result_center, _ = st.columns([0.3, 6, 0.3])
 
     if start_btn:
-        if not target_ip:
-            st.error("IP 주소를 입력해주세요!")
+        inventory_path = CURRENT_DIR / "temp_inventory.ini"
+        playbook_path = CURRENT_DIR / "check_playbook.yml"
+        
+        # 1. 대상 확인 및 인벤토리 생성
+        valid_target = False
+        with open(inventory_path, "w", encoding="utf-8") as f:
+            f.write("[targets]\n")
+            
+            # CSV 파일이 업로드된 경우 (탭2)
+            if uploaded_file is not None:
+                for _, row in df_targets.iterrows():
+                    f.write(f"{row['ip']} ansible_user={row['user']} ansible_password={row['pw']} ansible_become_password={row['pw']}\n")
+                display_msg = "다중 서버"
+                valid_target = True
+            
+            # 개별 IP가 입력된 경우 (탭1)
+            elif target_ip:
+                f.write(f"{target_ip} ansible_user={ssh_user} ansible_password={ssh_pw} ansible_become_password={ssh_pw}\n")
+                display_msg = target_ip
+                valid_target = True
+
+        if not valid_target:
+            st.error("진단 대상을 입력하거나 CSV 파일을 업로드해주세요!")
         else:
             with result_center:
-                with st.status(f"🌐 {target_ip} 진단 중...", expanded=True) as status:
-
-                    inventory_path = CURRENT_DIR / "temp_inventory.ini"
-                    playbook_path = CURRENT_DIR / "check_playbook.yml"
-
-                    with open(inventory_path, "w", encoding="utf-8") as f:
-                        f.write(
-                            "[targets]\n"
-                            f"{target_ip} ansible_user={ssh_user} "
-                            f"ansible_password={ssh_pw}\n"
-                        )
-
+                with st.status(f"🌐 {display_msg} 진단 중...", expanded=True) as status:
                     result = subprocess.run(
                         ["ansible-playbook", "-i", str(inventory_path), str(playbook_path)],
                         capture_output=True,
@@ -560,27 +583,46 @@ elif st.session_state.page == "check":
 
                     if result.returncode == 0:
                         status.update(label="✅ 진단 완료!", state="complete")
-                        st.session_state["latest_result_ip"] = target_ip
+                        # 단일 진단일 경우 바로 결과 세션 저장
+                        if uploaded_file is None:
+                            st.session_state["latest_result_ip"] = target_ip
                         st.balloons()
-                        st.success(f"🎉 {target_ip} 서버 점검 성공!")
+                        st.success(f"🎉 {display_msg} 점검 성공!")
                     else:
                         status.update(label="❌ 진단 실패", state="error")
                         st.error("진단 실행 중 오류가 발생했습니다.")
                         st.code(result.stderr)
-
-
+                        
     # =====================================================
     # RESULT REPORT (넓게)
     # =====================================================
-    if st.session_state.get("latest_result_ip"):
-        recent_ip = st.session_state["latest_result_ip"]
-        report_path = CURRENT_DIR / "reports" / f"{recent_ip}_result.txt"
-
-        if report_path.exists():
-
+    report_dir = CURRENT_DIR / "reports"
+    
+    # 1. 진단 결과 파일 목록 확인
+    if report_dir.exists():
+        report_files = sorted([f.name for f in report_dir.glob("*_result.txt")])
+        
+        if report_files:
             _, result_center, _ = st.columns([0.3, 6, 0.3])
             with result_center:
+                st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
+                st.divider()
+                st.markdown("### 📋 진단 결과 리포트 선택")
+                
+                # 여러 대 진단 시 선택할 수 있는 드롭다운 메뉴
+                selected_file = st.selectbox(
+                    "결과를 확인할 서버를 선택하세요", 
+                    report_files, 
+                    index=0,
+                    help="점검이 완료된 서버의 IP 목록입니다."
+                )
+                
+                # 선택된 파일에서 IP 추출하여 세션에 저장 (기존 로직과 연동)
+                recent_ip = selected_file.replace("_result.txt", "")
+                st.session_state["latest_result_ip"] = recent_ip
+                report_path = report_dir / selected_file
 
+                # --- 여기서부터 기존 리포트 출력 및 저장 로직 ---
                 st.markdown(
                     f"<h3>📊 {recent_ip} 진단 결과</h3>",
                     unsafe_allow_html=True
@@ -591,6 +633,7 @@ elif st.session_state.page == "check":
                     with open(report_path, "r", encoding="utf-8") as f:
                         for line in f:
                             line = line.strip()
+                            # JSON 형태만 파싱
                             if line.startswith("{") and line.endswith("}"):
                                 data = json.loads(line)
                                 parsed_results.append({
@@ -604,78 +647,44 @@ elif st.session_state.page == "check":
                     if parsed_results:
                         df = pd.DataFrame(parsed_results)
                         df = df[["코드", "중요도", "항목", "상태", "상세 사유"]]
-
-                        df["U_NUM"] = df["코드"].str.extract(r'U-(\d+)').astype(float)
-
-                        df["STATUS_ORDER"] = df["상태"].apply(
-                            lambda x: 0 if "취약" in str(x) else 1
-                        )
-
-                        df = df.sort_values(
-                            by=["STATUS_ORDER", "U_NUM"],
-                            ascending=[True, True]
-                        )
-
-                        df = df.drop(columns=["U_NUM", "STATUS_ORDER"])
-                        df = df.reset_index(drop=True)
-
                         st.session_state["latest_result_df"] = df
 
-                        def highlight_vulnerable(row):
-                            if "취약" in str(row["상태"]):
-                                return ["background-color: #ffe6e1"] * len(row)  # 연한 다홍색
-                            return [""] * len(row)
-
+                        # 데이터프레임 출력
                         st.dataframe(
                             df.style
-                                .apply(highlight_vulnerable, axis=1)  # 🔥 행 전체 배경
-                                .map(
-                                    lambda x: "color:red; font-weight:bold;" if "취약" in x else "color:green;",
-                                    subset=["상태"]
-                                )
-                                .map(
-                                    lambda x: "color:red;" if x == "상" else "color:orange;",
-                                    subset=["중요도"]
-                                ),
+                                .map(lambda x: "color:red" if "취약" in str(x) else "color:green", subset=["상태"])
+                                .map(lambda x: "color:red" if x == "상" else "color:orange", subset=["중요도"]),
                             use_container_width=True,
                             height=420
                         )
 
-
-                        from datetime import datetime
-
-                        HISTORY_DIR = CURRENT_DIR / "history"
-                        HISTORY_DIR.mkdir(exist_ok=True)
-
+                        # Word 저장 기능 (기존과 동일)
                         st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
-                        
-                        if st.button("📝 Word(.docx)로 보관함 저장"):
-                            df = st.session_state["latest_result_df"]
+                        if st.button(f"📝 {recent_ip} 결과 Word로 보관함 저장"):
+                            from datetime import datetime
+                            HISTORY_DIR = CURRENT_DIR / "history"
+                            HISTORY_DIR.mkdir(exist_ok=True)
 
                             date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-                            docx_path = HISTORY_DIR / f"{date_str}.docx"
+                            docx_path = HISTORY_DIR / f"{recent_ip}_{date_str}.docx"
 
                             save_df_to_docx(
                                 df,
                                 docx_path,
-                                target_ip=st.session_state["latest_result_ip"]
+                                target_ip=recent_ip
                             )
 
-                            st.success(f"📁 Word 파일이 보관함에 기록되었습니다: {docx_path.name}")
-
+                            st.success(f"📁 {recent_ip} 리포트가 보관함에 기록되었습니다.")
+                            
                             with open(str(docx_path), "rb") as f:
-                                docx_bytes = f.read()
-
-                            st.download_button(
-                                label="⬇️ Word 다운로드",
-                                data=docx_bytes,
-                                file_name=docx_path.name,
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            )
-                        st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
-
+                                st.download_button(
+                                    label="⬇️ Word 다운로드",
+                                    data=f.read(),
+                                    file_name=docx_path.name,
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                )
                     else:
-                        st.info("진단 결과가 존재하지 않습니다.")
+                        st.info(f"{recent_ip} 서버의 상세 진단 결과가 비어있습니다.")
 
                 except Exception as e:
                     st.error(f"리포트 처리 중 오류 발생: {e}")
