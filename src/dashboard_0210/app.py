@@ -24,6 +24,19 @@ REPORTS_DIR = BASE_DIR / "reports"
 HISTORY_DIR = BASE_DIR / "history"
 IMAGES_DIR = BASE_DIR / "images"
 CURRENT_DIR = BASE_DIR
+
+# --------------------추가
+def cleanup_reports():
+    import shutil
+    report_dir = CURRENT_DIR / "reports"
+    if report_dir.exists():
+        for f in report_dir.glob("*_result.txt"):
+            try:
+                f.unlink()
+            except:
+                pass
+#--------------------------
+
 def save_df_to_docx(df: pd.DataFrame, save_path, target_ip: str):
     doc = Document()
 
@@ -522,7 +535,10 @@ with st.sidebar:
 # MAIN / CHECK PAGE ROUTING
 # =========================================================
 if st.session_state.page == "main":
-
+     #--------------추가
+    cleanup_reports()
+    #------------------
+    
     st.markdown("""
     <div class="hero-wrapper">
         <div class="hero">
@@ -803,6 +819,10 @@ elif st.session_state.page == "check":
 # HISTORY PAGE
 # =========================================================
 elif st.session_state.page == "history":
+    #--------------추가
+    cleanup_reports()
+    #------------------
+    
     # ===============================
     # 배너
     # ===============================
