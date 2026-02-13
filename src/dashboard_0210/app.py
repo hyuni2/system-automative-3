@@ -732,7 +732,6 @@ elif st.session_state.page == "check":
             _, result_center, _ = st.columns([0.3, 6, 0.3])
             with result_center:
                 st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
-                st.divider()
                 st.markdown("### 📋 진단 결과 리포트 선택")
 
                 # 여러 대 진단 시 선택할 수 있는 드롭다운 메뉴
@@ -742,6 +741,7 @@ elif st.session_state.page == "check":
                     index=0,
                     help="점검이 완료된 서버의 IP 목록입니다."
                 )
+                st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
                 # 선택된 파일에서 IP 추출하여 세션에 저장 (기존 로직과 연동)
                 recent_ip = selected_file.replace("_result.txt", "")
                 st.session_state["latest_result_ip"] = recent_ip
