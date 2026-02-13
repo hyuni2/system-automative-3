@@ -4,6 +4,7 @@ import os
 import pandas as pd
 import json
 import re
+import io
 from streamlit_option_menu import option_menu
 import base64
 from pathlib import Path
@@ -18,6 +19,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import cm
 from datetime import datetime
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils.dataframe import dataframe_to_rows
+from datetime import datetime
+from openpyxl.utils import get_column_letter
 
 BASE_DIR = Path(__file__).resolve().parent
 REPORTS_DIR = BASE_DIR / "reports"
@@ -272,15 +278,36 @@ body {
 
 /* SECTION TITLE */
 .section-title {
-    font-size: 34px;
+    font-size: 38px;
     font-weight: 700;
-    margin-bottom: 14px;
+    letter-spacing: -0.5px;
+    margin-bottom: 28px;
+    color: #1f2937;
+    text-align: center;
 }
 
 .section-subtitle {
     font-size: 18px;
-    opacity: 0.7;
-    margin-bottom: 50px;
+    line-height: 1.9;
+    color: #4b5563;
+    max-width: 900px;
+    text-align: center;
+    margin: 0 auto;
+}
+
+.section-subtitle strong {
+    color: #111827;
+    font-weight: 600;
+}
+
+.section-subtitle a {
+    color: #005BAC;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.section-subtitle a:hover {
+    text-decoration: underline;
 }
 
 /* KPI STRIP */
@@ -591,7 +618,7 @@ if st.session_state.page == "main":
     <div class="hero-wrapper">
         <div class="hero">
             <div class="hero-content">
-                <h1>Linux Security Automation Platform</h1>
+                <h1>플랫폼 이름</h1>
                 <p>
                     by 치약좋지
                 </p>
@@ -601,48 +628,55 @@ if st.session_state.page == "main":
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div class="section" id="overview">
-        <div class="section-title">
-        Enterprise-Level Security Assessment
-        </div>
-        <div class="section-subtitle">
-        본 플랫폼은 
-    <a href="https://www.kisa.or.kr/2060204/form?postSeq=22&page=1"
-    target="_blank"
-    style="color:#005BAC; font-weight:600; text-decoration:none;">
-    KISA 주요정보통신기반시설 기술적 취약점 분석 상세 가이드(2026)
-    </a>
-    를 기준으로 설계된 통합 리눅스 보안 점검 자동화 시스템입니다.
-    수동 점검의 한계를 개선하고, 표준화된 정책 기반 진단과 
-    CVE 기반 취약점 인텔리전스를 결합하여
-    대규모 서버 환경에서도 일관된 보안 수준 평가를 수행합니다.
-        </div>
+<div class="section" id="overview">
+    <div class="section-title">
+        Linux Vulnerability Diagnosis Automation Platform
+    </div>
+    <div style="
+        width: 400px;
+        height: 2px;
+        background: rgba(0, 91, 172, 0.35);
+        margin: 22px auto 40px auto;
+        border-radius: 2px;
+    "></div>
+    <div class="section-subtitle">
+        <br><br>본 플랫폼은 
+        <a href="https://www.kisa.or.kr/2060204/form?postSeq=22&page=1"
+        target="_blank">
+        KISA 주요정보통신기반시설 기술적 취약점 분석 상세 가이드(2026)
+        </a>
+        를 기준으로 설계된 <br><strong>엔터프라이즈 리눅스 취약점 진단 자동화 플랫폼</strong>입니다.<br><br>
+        수동 점검 중심의 비효율적인 운영 방식을 개선하고,
+        표준화된 정책 기반 진단 체계를 자동화하여<br>
+        조직 내 보안 수준을 일관되게 유지할 수 있도록 지원합니다.<br><br>
+        <strong>단일 서버부터 대규모 인프라 환경까지 확장 가능한 보안 점검 서비스</strong>를 제공합니다.<br><br><br><br>
+    </div>
         <div class="feature-grid" id="features">
             <div class="feature-card">
                 <h4>Single Server Assessment</h4>
                 <p>
-                IP 입력 기반 실시간 취약점 자동 진단.
+                IP 입력 기반 실시간 취약점 자동 진단.<br>
                 KISA 표준 항목 기반 정밀 점검 수행.
                 </p>
             </div>
             <div class="feature-card">
                 <h4>Bulk Server Inspection</h4>
                 <p>
-                CSV 업로드 기반 다수 서버 일괄 분석.
-                운영 환경에 최적화된 대규모 자동 점검.
+                CSV 업로드 기반 다수 서버 일괄 분석.<br>
+                운영 환경에 최적화된 대규모 자동 점검 수행.
                 </p>
             </div>
             <div class="feature-card">
                 <h4>Automated Reporting</h4>
                 <p>
-                진단 결과 자동 정리 및 Word 보고서 생성.
-                감사 대응 및 보안 문서화 지원.
+                진단 결과 자동 정리 및 Word 보고서 생성.<br>
+                감사 대응 및 문서화 지원.
                 </p>
             </div>
             <div class="feature-card">
                 <h4>CVE Intelligence Integration</h4>
                 <p>
-                설정 취약점 + 공개 취약점 동시 분석.
+                설정 취약점 + 공개 취약점 동시 분석.<br>
                 정책 기반 진단과 실시간 위협 인텔리전스 결합.
                 </p>
             </div>
@@ -719,7 +753,7 @@ elif st.session_state.page == "check":
     _, center, _ = st.columns([1, 3, 1])
     with center:
         # 탭 디자인 생성
-        tab1, tab2 = st.tabs(["🎯 개별 서버 진단", "📁 대량 서버 진단 (CSV)"])
+        tab1, tab2 = st.tabs(["🎯 개별 서버 진단", "📁 다중 서버 진단 (CSV)"])
         st.markdown("""
         <style>
 
@@ -924,30 +958,82 @@ elif st.session_state.page == "check":
                             height=420
                         )
 
-                        # Word 저장 기능 (기존과 동일)
                         st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
-                        if st.button(f"📝 {recent_ip} 결과 Word로 보관함 저장"):
-                            from datetime import datetime
+                        if st.button(f"📊 {recent_ip} 결과 Excel로 보관함 저장"):
+
                             HISTORY_DIR = CURRENT_DIR / "history"
                             HISTORY_DIR.mkdir(exist_ok=True)
 
-                            date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-                            docx_path = HISTORY_DIR / f"{recent_ip}_{date_str}.docx"
+                            date_str = datetime.now().strftime("%Y-%m-%d")
+                            file_time = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 
-                            save_df_to_docx(
-                                df,
-                                docx_path,
-                                target_ip=recent_ip
-                            )
+                            excel_path = HISTORY_DIR / f"{recent_ip}_{file_time}.xlsx"
 
-                            st.success(f"📁 {recent_ip} 리포트가 보관함에 기록되었습니다.")
+                            wb = Workbook()
+                            ws = wb.active
+                            ws.title = "Diagnosis Result"
 
-                            with open(str(docx_path), "rb") as f:
+                            ws.merge_cells("A1:E1")
+                            ws["A1"] = f"{date_str} 취약점 점검 결과"
+                            ws["A1"].font = Font(size=16, bold=True)
+                            ws["A1"].alignment = Alignment(horizontal="center")
+
+                            ws.merge_cells("A2:E2")
+                            ws["A2"] = f"대상 서버 : {recent_ip}"
+                            ws["A2"].font = Font(size=12, bold=True)
+                            ws["A2"].alignment = Alignment(horizontal="center")
+
+                            start_row = 4
+
+                            for r_idx, row in enumerate(dataframe_to_rows(df, index=False, header=True), start_row):
+                                for c_idx, value in enumerate(row, 1):
+                                    ws.cell(row=r_idx, column=c_idx, value=value)
+
+                            vuln_fill = PatternFill(start_color="FFE6E1", end_color="FFE6E1", fill_type="solid")
+                            red_font = Font(color="FF0000", bold=True)
+                            green_font = Font(color="008000")
+                            orange_font = Font(color="FF8C00")
+
+                            from openpyxl.styles import Border, Side
+
+                            thin = Side(style="thin")
+                            border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+                            for row in ws.iter_rows(min_row=start_row+1, max_row=ws.max_row):
+                                status_cell = row[3]
+                                severity_cell = row[1]
+
+                                # 모든 셀에 동일한 border 적용
+                                for cell in row:
+                                    cell.border = border
+
+                                if status_cell.value == "취약":
+                                    for cell in row:
+                                        status_cell.font = red_font
+
+                                elif status_cell.value == "양호":
+                                    status_cell.font = green_font
+
+                                if severity_cell.value == "상":
+                                    severity_cell.font = red_font
+                                elif severity_cell.value == "중":
+                                    severity_cell.font = orange_font
+
+                            from openpyxl.utils import get_column_letter
+
+                            for col_idx in range(1, ws.max_column + 1):
+                                ws.column_dimensions[get_column_letter(col_idx)].width = 22
+
+                            wb.save(excel_path)
+
+                            st.success(f"📁 {recent_ip} Excel 리포트가 저장되었습니다.")
+
+                            with open(excel_path, "rb") as f:
                                 st.download_button(
-                                    label="⬇️ Word 다운로드",
+                                    label="⬇️ Excel 다운로드",
                                     data=f.read(),
-                                    file_name=docx_path.name,
-                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                    file_name=excel_path.name,
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                 )
 
                     else:
@@ -1011,7 +1097,7 @@ elif st.session_state.page == "history":
         HISTORY_DIR = CURRENT_DIR / "history"
         HISTORY_DIR.mkdir(exist_ok=True)
 
-        files = sorted(HISTORY_DIR.glob("*.docx"), reverse=True)
+        files = sorted(HISTORY_DIR.glob("*.xlsx"), reverse=True)
 
         if not files:
             st.info("저장된 진단 기록이 없습니다.")
