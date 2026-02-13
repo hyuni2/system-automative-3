@@ -604,21 +604,43 @@ elif st.session_state.page == "check":
                     if parsed_results:
                         df = pd.DataFrame(parsed_results)
                         df = df[["코드", "중요도", "항목", "상태", "상세 사유"]]
+
+                        df["U_NUM"] = df["코드"].str.extract(r'U-(\d+)').astype(float)
+
+                        df["STATUS_ORDER"] = df["상태"].apply(
+                            lambda x: 0 if "취약" in str(x) else 1
+                        )
+
+                        df = df.sort_values(
+                            by=["STATUS_ORDER", "U_NUM"],
+                            ascending=[True, True]
+                        )
+
+                        df = df.drop(columns=["U_NUM", "STATUS_ORDER"])
+                        df = df.reset_index(drop=True)
+
                         st.session_state["latest_result_df"] = df
+
+                        def highlight_vulnerable(row):
+                            if "취약" in str(row["상태"]):
+                                return ["background-color: #ffe6e1"] * len(row)  # 연한 다홍색
+                            return [""] * len(row)
 
                         st.dataframe(
                             df.style
+                                .apply(highlight_vulnerable, axis=1)  # 🔥 행 전체 배경
                                 .map(
-                                    lambda x: "color:red" if "취약" in x else "color:green",
+                                    lambda x: "color:red; font-weight:bold;" if "취약" in x else "color:green;",
                                     subset=["상태"]
                                 )
                                 .map(
-                                    lambda x: "color:red" if x == "상" else "color:orange",
+                                    lambda x: "color:red;" if x == "상" else "color:orange;",
                                     subset=["중요도"]
                                 ),
                             use_container_width=True,
                             height=420
                         )
+
 
                         from datetime import datetime
 
