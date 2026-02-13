@@ -434,6 +434,54 @@ section[data-testid="stMain"] {
     width: 100% !important;
     max-width: 100% !important;
 }
+.about-wrapper {
+    margin-top: 120px;
+    padding: 80px 0;
+}
+
+.about-header h2 {
+    font-size: 32px;
+    margin-bottom: 8px;
+}
+
+.about-header p {
+    color: #777;
+    margin-bottom: 60px;
+}
+
+.team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 40px;
+}
+
+.team-card {
+    padding: 28px 0;
+    border-top: 2px solid #111;
+    transition: all 0.3s ease;
+}
+
+.team-card:hover {
+    transform: translateY(-4px);
+}
+
+.team-name {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.team-role {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 10px;
+}
+
+.team-email {
+    font-size: 14px;
+    color: #888;
+}
+
 </style>
 
 <style>
@@ -545,13 +593,8 @@ if st.session_state.page == "main":
             <div class="hero-content">
                 <h1>Linux Security Automation Platform</h1>
                 <p>
-                    KISA 주요정보통신기반시설 기술적 취약점 분석 가이드 기반<br>
-                    엔터프라이즈 리눅스 보안 진단 자동화 시스템
+                    by 치약좋지
                 </p>
-                <div class="hero-cta">
-                    <a href="#overview" class="cta-primary">플랫폼 소개</a>
-                    <a href="#features" class="cta-outline">기능 보기</a>
-                </div>
             </div>
         </div>
     </div>
@@ -563,7 +606,16 @@ if st.session_state.page == "main":
         Enterprise-Level Security Assessment
         </div>
         <div class="section-subtitle">
-        표준 기반 점검 · 자동화 · 대규모 서버 지원
+        본 플랫폼은 
+    <a href="https://www.kisa.or.kr/2060204/form?postSeq=22&page=1"
+    target="_blank"
+    style="color:#005BAC; font-weight:600; text-decoration:none;">
+    KISA 주요정보통신기반시설 기술적 취약점 분석 상세 가이드(2026)
+    </a>
+    를 기준으로 설계된 통합 리눅스 보안 점검 자동화 시스템입니다.
+    수동 점검의 한계를 개선하고, 표준화된 정책 기반 진단과 
+    CVE 기반 취약점 인텔리전스를 결합하여
+    대규모 서버 환경에서도 일관된 보안 수준 평가를 수행합니다.
         </div>
         <div class="feature-grid" id="features">
             <div class="feature-card">
@@ -595,10 +647,37 @@ if st.session_state.page == "main":
                 </p>
             </div>
         </div>
+        <div class="about-wrapper">
+    <div class="about-header">
+        <h2>About Us</h2>
     </div>
+    <div class="team-grid">
+        <div class="team-card">
+            <div class="team-name">송연수</div>
+            <div class="team-email">songyeonsu12@gmail.com</div>
+        </div>
+        <div class="team-card">
+            <div class="team-name">김연진</div>
+            <div class="team-email">kyj9750322@gmail.com</div>
+        </div>
+        <div class="team-card">
+            <div class="team-name">김태훈</div>
+            <div class="team-email">kevin9480@naver.com</div>
+        </div>
+        <div class="team-card">
+            <div class="team-name">이희윤</div>
+            <div class="team-email">youthgmldbs@gmail.com</div>
+        </div>
+        <div class="team-card">
+            <div class="team-name">조수진</div>
+            <div class="team-email">suujin1025@gmail.com</div>
+        </div>
+    </div>
+</div>
+</div>
+
     """, unsafe_allow_html=True)
-
-
+    
 elif st.session_state.page == "check":
 
     # ===============================
