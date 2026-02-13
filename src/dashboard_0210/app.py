@@ -701,16 +701,17 @@ elif st.session_state.page == "check":
     st.markdown("""
     <div class="diagnosis-wrapper">
         <div class="diagnosis-card">
-            <h3 class="diagnosis-title">⚙️ 진단 설정</h3>
+            <h3 class="diagnosis-title">⚙️ 취약점 진단</h3>
             <div class="diagnosis-desc">
-                대상 서버 정보를 입력하여 보안 점검을 실행합니다.<br>
-                SSH 접속 정보를 입력하면 Ansible 기반 점검을 수행합니다.
+            단일 서버에 대한 개별 진단과<br>
+            다중 서버에 대한 일괄 진단을 지원합니다.<br>
+            환경 규모에 따라 유연한 점검 방식을 선택할 수 있습니다.
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:80px'></div>", unsafe_allow_html=True)
 
     # ===============================
     # INPUT FORM (탭 적용: 개별 입력 vs CSV 업로드)
@@ -719,6 +720,37 @@ elif st.session_state.page == "check":
     with center:
         # 탭 디자인 생성
         tab1, tab2 = st.tabs(["🎯 개별 서버 진단", "📁 대량 서버 진단 (CSV)"])
+        st.markdown("""
+        <style>
+
+        /* 기본 탭 버튼 스타일 */
+        div[data-testid="stTabs"] button {
+            font-size: 18px !important;
+            font-weight: 700 !important;      /* 글자 굵게 */
+            padding: 14px 28px !important;
+            border-radius: 10px 10px 0 0 !important;
+            border-bottom: none !important;   /* 파란 밑줄 제거 */
+        }
+
+        /* Streamlit 기본 파란 슬라이드바 제거 */
+        div[data-testid="stTabs"] div[role="tablist"]::after {
+            display: none !important;
+        }
+
+        /* 선택된 탭 */
+        div[data-testid="stTabs"] button[aria-selected="true"] {
+            background-color: #f2f2f2 !important;   /* 회색 배경 */
+            color: #000 !important;
+        }
+
+        /* 선택되지 않은 탭 */
+        div[data-testid="stTabs"] button[aria-selected="false"] {
+            background-color: transparent !important;
+            color: #444 !important;
+        }
+
+        </style>
+        """, unsafe_allow_html=True)
 
         with tab1:
             target_ip = st.text_input("대상 서버 IP", placeholder="192.168.x.x", key="single_ip")
@@ -796,7 +828,13 @@ elif st.session_state.page == "check":
                         st.error("진단 실행 중 오류가 발생했습니다.")
                         st.code(result.stderr)
 
+                        # 에러나면 주석 풀고 디버깅용으로 사용하새요 ~
+                        # st.write("Return Code:", result.returncode)
+                        # st.write("STDOUT:")
+                        # st.code(result.stdout)
 
+                        # st.write("STDERR:")
+                        # st.code(result.stderr)
 
     # =====================================================
     # RESULT REPORT (넓게)
@@ -922,9 +960,7 @@ elif st.session_state.page == "check":
 # HISTORY PAGE
 # =========================================================
 elif st.session_state.page == "history":
-    #--------------추가
     cleanup_reports()
-    #------------------
     
     # ===============================
     # 배너
@@ -949,12 +985,12 @@ elif st.session_state.page == "history":
         <div class="diagnosis-card">
             <h3 class="diagnosis-title">⚙️ 진단 결과</h3>
             <div class="diagnosis-desc">
-                진단 결과를 출력합니다.
+                저장된 진단 결과를 보관합니다.
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:80px'></div>", unsafe_allow_html=True)
 
     _, center, _ = st.columns([1, 3, 1])
 
@@ -966,7 +1002,7 @@ elif st.session_state.page == "history":
                 font-weight: 500;
                 margin-bottom: 12px;
             ">
-                📂 진단 기록
+                📂 보관함
             </div>
             """,
             unsafe_allow_html=True
@@ -997,7 +1033,8 @@ elif st.session_state.page == "history":
                 
                 with col_del:
                     # 개별 삭제 버튼
-                    if st.button("🗑️ 삭제", key=f"del_{f.name}", use_container_width=True):
+                    if st.button("삭제", key=f"del_{f.name}", use_container_width=True):
+
                         import os
                         
                         # 1. history 폴더의 .docx 삭제
