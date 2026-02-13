@@ -3,6 +3,7 @@
 U_05() {
   local code="U-05"
   local item="root 이외의 UID가 '0' 금지"
+  local severity="상"
   local status="양호"
   local reason="root 계정과 동일한 UID(0)를 갖는 계정이 존재하지 않습니다."
 
@@ -17,13 +18,14 @@ U_05() {
     reason="/etc/passwd 파일이 존재하지 않아 점검할 수 없습니다."
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_10() {
   local code="U-10"
   local item="동일한 UID 금지"
+  local severity="중"
   local status="양호"
   local reason="동일한 UID로 설정된 사용자 계정이 존재하지 않습니다."
 
@@ -38,13 +40,14 @@ U_10() {
     reason="/etc/passwd 파일이 존재하지 않아 점검할 수 없습니다."
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_15() {
   local code="U-15"
   local item="소유자 없는 파일 및 디렉터리 점검"
+  local severity="상"
   local status="양호"
   local reason="소유자가 존재하지 않는 파일 및 디렉터리가 존재하지 않습니다."
 
@@ -59,13 +62,14 @@ U_15() {
     reason="소유자가 존재하지 않는 파일 또는 디렉터리가 존재합니다. (건수: ${orphan_count})"
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_20() {
   local code="U-20"
   local item="systemd *.socket, *.service 파일 소유자 및 권한 설정"
+  local severity="상"
   local status="양호"
   local reason="systemd socket/service 파일의 소유자가 root이고 권한이 644 이하입니다."
 
@@ -102,13 +106,14 @@ U_20() {
     fi
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_25() {
   local code="U-25"
   local item="world writable 파일 점검"
+  local severity="상"
   local status="양호"
   local reason="world writable 파일이 존재하지 않습니다."
 
@@ -122,13 +127,14 @@ U_25() {
     reason="world writable 파일이 존재합니다. (건수: ${cnt})"
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_30() {
   local code="U-30"
   local item="UMASK 설정 관리"
+  local severity="중"
   local status="양호"
   local reason="UMASK 값이 022 이상으로 설정되어 있습니다."
 
@@ -141,13 +147,14 @@ U_30() {
     reason="현재 세션 UMASK 값이 022 미만입니다. (현재: ${cur_umask})"
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_35() {
   local code="U-35"
   local item="공유 서비스 익명 접근 제한"
+  local severity="상"
   local status="양호"
   local reason="익명 접근이 허용된 공유 서비스가 발견되지 않았습니다."
 
@@ -169,13 +176,14 @@ U_35() {
     reason="Samba 설정에서 게스트/익명 접근이 허용되어 있습니다."
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_40() {
   local code="U-40"
   local item="NFS 접근 통제"
+  local severity="상"
   local status="양호"
   local reason="불필요한 NFS 서비스가 동작하지 않거나, 안전하게 설정되어 있습니다."
 
@@ -198,13 +206,14 @@ U_40() {
     fi
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_45() {
   local code="U-45"
   local item="메일 서비스 버전 점검"
+  local severity="상"
   local status="양호"
   local reason="메일 서비스가 최신 버전이거나 동작하지 않습니다."
   local latest="8.18.2"
@@ -219,13 +228,14 @@ U_45() {
     fi
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_50() {
   local code="U-50"
   local item="DNS Zone Transfer 설정"
+  local severity="상"
   local status="양호"
   local reason="DNS 서비스가 안전하게 설정되어 있거나 동작하지 않습니다."
 
@@ -241,19 +251,20 @@ U_50() {
     fi
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_55() {
   local code="U-55"
   local item="FTP 계정 Shell 제한"
+  local severity="중"
   local status="양호"
   local reason="FTP 서비스가 미설치되어 있습니다."
 
   if ! rpm -qa | grep -Eqi 'vsftpd|proftpd'; then
-    printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-      "$code" "$item" "$status" "$reason"
+    printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+      "$code" "$item" "$severity" "$status" "$reason"
     return
   fi
 
@@ -282,20 +293,21 @@ U_55() {
     reason="FTP 계정에 /bin/false 또는 nologin 쉘이 부여되어 있습니다."
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_60() {
   local code="U-60"
   local item="SNMP Community String 복잡성 설정"
+  local severity="중"
   local status="양호"
   local reason="SNMP 서비스가 미설치 또는 미동작 상태입니다."
   ps_snmp_count=$(ps -ef | grep -iE 'snmpd|snmptrapd' | grep -v grep | wc -l)
   # SNMP 미설치 시 양호
   if [ "$ps_snmp_count" -eq 0 ]; then
-    printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-      "$code" "$item" "$status" "$reason"
+    printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+      "$code" "$item" "$severity" "$status" "$reason"
     return
   fi
   status="취약"
@@ -305,28 +317,29 @@ U_60() {
   [ -f /etc/snmp/snmpd.conf ] && snmpdconf_files+=("/etc/snmp/snmpd.conf")
 
   if [ "${#snmpdconf_files[@]}" -eq 0 ]; then
-    printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-      "$code" "$item" "$status" "$reason"
+    printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+      "$code" "$item" "$severity" "$status" "$reason"
     return
   fi
   for f in "${snmpdconf_files[@]}"; do
     if grep -qiE 'public|private' "$f"; then
       reason="SNMP Community String이 기본값(public/private)으로 설정되어 있습니다."
-      printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-        "$code" "$item" "$status" "$reason"
+      printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+      "$code" "$item" "$severity" "$status" "$reason"
       return
     fi
   done
   status="양호"
   reason="SNMP Community String이 복잡성 기준을 만족합니다."
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+      "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_65() {
   local code="U-65"
   local item="NTP 및 시각 동기화 설정"
+  local severity="중"
   local status="양호"
   local reason="NTP 또는 시각 동기화 서비스가 정상적으로 설정 및 동작 중입니다."
 
@@ -335,7 +348,7 @@ U_65() {
   ntpd_active=$(systemctl is-active ntpd 2>/dev/null)
 
   if [[ "$timesyncd_ntp" != "yes" && "$chronyd_active" != "active" && "$ntpd_active" != "active" ]]; then
-    printf '{"item":"%s","status":"취약","reason":"NTP 또는 시각 동기화 서비스가 활성화되어 있지 않습니다."}\n' \
+    printf '{"item":"%s","severity":"%s","status":"취약","reason":"NTP 또는 시각 동기화 서비스가 활성화되어 있지 않습니다."}\n' \
       "$item"
     return
   fi
@@ -350,8 +363,8 @@ U_65() {
     reason="NTP 서버 설정은 존재하나, 현재 동기화 상태를 정상으로 확인하지 못했습니다."
   fi
 
-  printf '{"code":"%s","item":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$item" "$status" "$reason"
+  printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+    "$code" "$item" "$severity" "$status" "$reason"
 }
 
 U_05
