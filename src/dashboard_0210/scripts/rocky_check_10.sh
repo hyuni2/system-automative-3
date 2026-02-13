@@ -884,116 +884,90 @@ U_12() {
 
 U_13() {
   local code="U-13"
-  local item="안전한 비밀번호 암호화 알고리즘 사용 (Rocky 10.x 기준)"
+  local item="안전한 비밀번호 암호화 알고리즘 사용"
   local severity="중"
   local status="양호"
-  local reason="안전한 해시 알고리즘(yescrypt/SHA-2)만 사용 중입니다."
+  local reason="SHA-2 계열(SHA-256/512) 비밀번호 해시 알고리즘을 사용하고 있습니다."
+
+  _json_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+  }
 
   local shadow="/etc/shadow"
 
-  # JSON 특수문자 처리를 위한 이스케이프 함수 (문법 오류 수정)
-  _json_escape() {
-    # 한 줄로 정돈하여 '-e: 명령어를 찾을 수 없음' 에러 방지
-    sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\r/\\r/g' -e 's/\t/\\t/g' | tr -d '\n'
-  }
-
-  # 0) 파일 접근 가능 여부
   if [ ! -e "$shadow" ]; then
     status="N/A"
     reason="$shadow 파일이 없습니다."
-  elif [ ! -r "$shadow" ]; then
-    status="N/A"
-    reason="$shadow 파일을 읽을 수 없습니다. (권한 부족: root 권한 필요)"
-  else
-    # 1) 계정별 해시 알고리즘 검사
-    local vuln_found=0
-    local checked=0
-    local good_count=0
-    local evidence_bad=""
-    local evidence_good_sample=""
-
-    local user hash rest
-
-    while IFS=: read -r user hash rest; do
-      [ -z "$user" ] && continue
-
-      # 비밀번호 미설정/잠금 계정 제외
-      if [ -z "$hash" ] || [[ "$hash" =~ ^[!*]+$ ]]; then
-        continue
-      fi
-
-      ((checked++))
-
-      # yescrypt ($y$)
-      if [[ "$hash" == \$y\$* ]]; then
-        ((good_count++))
-        if [ "$(echo "$evidence_good_sample" | wc -w)" -lt 10 ]; then
-          evidence_good_sample+="$user:yescrypt "
-        fi
-        continue
-      fi
-
-      # SHA-512 ($6$)
-      if [[ "$hash" == \$6\$* ]]; then
-        ((good_count++))
-        if [ "$(echo "$evidence_good_sample" | wc -w)" -lt 10 ]; then
-          evidence_good_sample+="$user:sha512 "
-        fi
-        continue
-      fi
-
-      # SHA-256 ($5$)
-      if [[ "$hash" == \$5\$* ]]; then
-        ((good_count++))
-        if [ "$(echo "$evidence_good_sample" | wc -w)" -lt 10 ]; then
-          evidence_good_sample+="$user:sha256 "
-        fi
-        continue
-      fi
-
-      # 명확히 취약한 케이스 (MD5)
-      if [[ "$hash" == \$1\$* ]]; then
-        vuln_found=1
-        evidence_bad+="$user:MD5(\$1\$) "
-        continue
-      fi
-
-      # $로 시작하지만 미분류: UNKNOWN
-      if [[ "$hash" == \$* ]]; then
-        local id
-        id="$(printf '%s' "$hash" | awk -F'$' '{print $2}')"
-        [ -z "$id" ] && id="UNKNOWN"
-        vuln_found=1
-        evidence_bad+="$user:UNKNOWN(\$$id\$) "
-        continue
-      fi
-
-      # $로 시작 안 함: 레거시/불명 포맷
-      vuln_found=1
-      evidence_bad+="$user:LEGACY/UNKNOWN_FORMAT "
-    done < "$shadow"
-
-    if [ "$checked" -eq 0 ]; then
-      status="N/A"
-      reason="점검 가능한 패스워드 해시 계정이 없습니다. (모두 잠금/미설정 계정일 수 있음)"
-    elif [ "$vuln_found" -eq 1 ]; then
-      status="취약"
-      reason="안전 기준(yescrypt/SHA-2) 미만 또는 불명확한 해시 알고리즘 계정 존재 (점검=$checked, 양호추정=$good_count, 근거=$evidence_bad)"
-    else
-      status="양호"
-      reason="안전한 해시 알고리즘(yescrypt/SHA-2)만 사용 중입니다. (점검=$checked, 샘플=$evidence_good_sample)"
-    fi
+    printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+      "$code" "$item" "$severity" "$status" "$(_json_escape "$reason")"
+    return 0
   fi
 
-  # 출력 형식 유지 (JSON 형태)
-  local esc_item esc_sev esc_status esc_reason
-  esc_item="$(printf '%s' "$item" | _json_escape)"
-  esc_sev="$(printf '%s' "$severity" | _json_escape)"
-  esc_status="$(printf '%s' "$status" | _json_escape)"
-  esc_reason="$(printf '%s' "$reason" | _json_escape)"
+  if [ ! -r "$shadow" ]; then
+    status="N/A"
+    reason="$shadow 파일을 읽을 수 없습니다. (권한 부족: root 권한 필요)"
+    printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
+      "$code" "$item" "$severity" "$status" "$(_json_escape "$reason")"
+    return 0
+  fi
+
+  local vuln_found=0
+  local checked=0
+  local evidence=""
+
+  while IFS=: read -r user hash rest; do
+    [ -z "$user" ] && continue
+
+    if [ -z "$hash" ] || [[ "$hash" =~ ^[!*]+$ ]]; then
+      continue
+    fi
+
+    if [[ "$hash" != \$* ]]; then
+      checked=$((checked + 1))
+      vuln_found=1
+      evidence+="$user:UNKNOWN_FORMAT; "
+      continue
+    fi
+
+    local id
+    id="$(echo "$hash" | awk -F'$' '{print $2}')"
+    [ -z "$id" ] && id="UNKNOWN"
+
+    checked=$((checked + 1))
+
+    if [ "$id" = "5" ] || [ "$id" = "6" ]; then
+      : # good (sha256/sha512)
+    else
+      vuln_found=1
+      evidence+="$user:\$$id\$; "
+    fi
+  done < "$shadow"
+
+  if [ "$checked" -eq 0 ]; then
+    status="N/A"
+    reason="점검 가능한 패스워드 해시 계정이 없습니다. (모두 잠금/미설정 계정일 수 있음)"
+  elif [ "$vuln_found" -eq 1 ]; then
+    status="취약"
+    evidence="$(echo "$evidence" | tr -s ' ' | sed -e 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    reason="취약하거나 기준(SHA-2) 미만의 해시 알고리즘을 사용하는 계정이 존재합니다. ${evidence:+(탐지: $evidence)}"
+  else
+    status="양호"
+    reason="SHA-2 계열(SHA-256/512) 비밀번호 해시 알고리즘을 사용하고 있습니다."
+  fi
+
+  # reason 250자 제한(원하면 제거 가능)
+  local r="$reason"
+  r="$(echo "$r" | tr '\r' ' ' | sed -e 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+  if (( ${#r} > 250 )); then r="${r:0:250}..."; fi
 
   printf '{"code":"%s","item":"%s","severity":"%s","status":"%s","reason":"%s"}\n' \
-    "$code" "$esc_item" "$esc_sev" "$esc_status" "$esc_reason"
+    "$code" "$item" "$severity" "$status" "$(_json_escape "$r")"
 }
 
 U_14() {
