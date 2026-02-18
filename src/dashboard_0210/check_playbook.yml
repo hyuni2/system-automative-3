@@ -14,6 +14,7 @@
     # Ubuntu
     - name: Run Diagnosis Script for Ubuntu
       script: "{{ playbook_dir }}/../OS_Scripts/Debian-family/Ubuntu24.sh"
+      become: yes
       register: ubuntu_result
       when: ansible_facts["distribution"] == "Ubuntu"
       ignore_errors: yes
@@ -21,6 +22,7 @@
     # Rocky 9
     - name: Run Diagnosis Script for Rocky Linux 9
       script: "{{ playbook_dir }}/../OS_Scripts/RHEL-family/Rocky9.sh"
+      become: yes
       register: rocky9_result          # 분리
       when:
         - ansible_facts["distribution"] == "Rocky"
@@ -30,6 +32,7 @@
     # Rocky 10
     - name: Run Diagnosis Script for Rocky Linux 10
       script: "{{ playbook_dir }}/../OS_Scripts/RHEL-family/Rocky10.sh"
+      become: yes
       register: rocky10_result         # 분리
       when:
         - ansible_facts["distribution"] == "Rocky"

@@ -1,0 +1,4 @@
+
+{"source": "nuclei", "record_type": "scan_meta", "code": "NUC-SCAN-INFO", "item": "Nuclei 템플릿 스캔 시작", "severity": "하", "status": "정보", "reason": "템플릿 12721개를 대상으로 스캔을 시작합니다.", "templates_dir": "/home/kimyeonjin/system-automative-3/src/dashboard_0210/nuclei-templates", "templates_count": 12721, "target": "172.16.80.134", "started_at": "2026-02-18T17:43:24.451715"}
+{"source": "nuclei", "record_type": "scan_meta", "code": "NUC-NO-FINDING", "item": "Nuclei 탐지 결과", "severity": "하", "status": "양호", "reason": "탐지된 취약점이 없습니다.", "templates_dir": "/home/kimyeonjin/system-automative-3/src/dashboard_0210/nuclei-templates", "templates_count": 12721, "target": "172.16.80.134", "started_at": "2026-02-18T17:43:24.451715", "finished_at": "2026-02-18T17:44:57.145208", "duration_sec": 92.69}
+

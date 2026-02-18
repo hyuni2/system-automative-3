@@ -323,20 +323,33 @@ elif st.session_state.page == "check":
             with result_center:
                 with st.status(f"🌐 {display_msg} 통합 진단 중 (OS + Nuclei)...", expanded=True) as status:
                     cmd = ["ansible-playbook", "-i", str(inventory_path), str(playbook_path)]
-                    result = subprocess.run(
-                        cmd,
-                        capture_output=True,
-                        text=True
-                    )
+                    try:
+                        result = subprocess.run(
+                            cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=1800
+                        )
+                    except subprocess.TimeoutExpired as e:
+                        status.update(label="진단 시간 초과", state="error")
+                        st.error("원격 서버에서 명령 대기 상태일 수 있습니다.")
+                        st.write("실행 명령어:")
+                        st.code(" ".join(shlex.quote(part) for part in cmd), language="bash")
+                        with st.expander("진단 디버그 로그 보기", expanded=True):
+                            st.write("STDOUT:")
+                            st.code((e.stdout or "").strip() if (e.stdout or "").strip() else "(비어 있음)")
+                            st.write("STDERR:")
+                            st.code((e.stderr or "").strip() if (e.stderr or "").strip() else "(비어 있음)")
+                        result = None
 
-                    if result.returncode == 0:
+                    if result is not None and result.returncode == 0:
                         status.update(label="✅ 통합 진단 완료!", state="complete")
                         # 단일 진단일 경우 바로 결과 세션 저장
                         if is_single:
                             st.session_state["latest_result_ip"] = target_ip
                         st.balloons()
                         st.success(f"🎉 {display_msg} 통합 점검 성공!")
-                    else:
+                    elif result is not None:
                         status.update(label="❌ 진단 실패", state="error")
                         st.error("진단 실행 중 오류가 발생했습니다.")
                         st.write(f"Return code: `{result.returncode}`")
@@ -402,12 +415,23 @@ elif st.session_state.page == "check":
                                 data = json.loads(line)
                                 source = data.get("source", "")
                                 record_type = data.get("record_type", "")
+                                code = data.get("code", "")
 
                                 if source == "nuclei" and record_type == "scan_meta":
                                     nuclei_scan_meta.append(data)
+                                    # 스캔 결과 의미가 있는 메타는 표에 포함
+                                    if code in {"NUC-NO-FINDING", "NUC-ERR-RUN", "NUC-ERR-TEMPLATES"}:
+                                        parsed_results.append({
+                                            "분류": "Nuclei",
+                                            "코드": code,
+                                            "중요도": data.get("severity"),
+                                            "항목": data.get("item"),
+                                            "상태": data.get("status"),
+                                            "상세 사유": data.get("reason"),
+                                            "템플릿ID": "-",
+                                        })
                                     continue
 
-                                code = data.get("code", "")
                                 is_nuclei = (
                                     source == "nuclei"
                                     or str(code).startswith("NUC-")
@@ -598,6 +622,17 @@ elif st.session_state.page == "check":
 
                     else:
                         st.info(f"{recent_ip} 서버의 상세 진단 결과가 비어있습니다.")
+                        try:
+                            raw_text = report_path.read_text(encoding="utf-8").strip()
+                        except Exception:
+                            raw_text = ""
+
+                        st.warning("JSON 형식 결과를 찾지 못했습니다. 원문 리포트를 확인하세요.")
+                        with st.expander("원문 리포트 보기", expanded=True):
+                            if raw_text:
+                                st.code(raw_text)
+                            else:
+                                st.code("(리포트 파일이 비어 있습니다.)")
 
                 except Exception as e:
                     st.error(f"리포트 처리 중 오류 발생: {e}") 

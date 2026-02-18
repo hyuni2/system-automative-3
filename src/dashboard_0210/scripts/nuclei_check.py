@@ -24,7 +24,7 @@ def run_nuclei(target_ip, templates_dir: Path):
         nuclei_path,
         "-u", target_ip,
         "-t", str(templates_dir),
-        "-json",
+        "-j",
         "-silent",
         "-rate-limit", "50",
         "-timeout", "10"
