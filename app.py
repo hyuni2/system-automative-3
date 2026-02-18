@@ -459,6 +459,10 @@ elif st.session_state.page == "check":
                                 None
                             )
                             detected_count = len(nuclei_findings)
+                            scan_errors = [
+                                m for m in nuclei_scan_meta
+                                if str(m.get("status")) == "점검불가" or str(m.get("code", "")).startswith("NUC-ERR")
+                            ]
 
                             st.caption(
                                 f"템플릿 경로: `{meta_templates_dir}` | "
@@ -467,7 +471,10 @@ elif st.session_state.page == "check":
                                 + (f" | 실행 시간: `{meta_duration}초`" if meta_duration is not None else "")
                             )
 
-                            if nuclei_findings:
+                            if scan_errors:
+                                last_err = scan_errors[-1]
+                                st.error(f"Nuclei 실행 상태: 점검불가 ({last_err.get('reason', '원인 불명')})")
+                            elif nuclei_findings:
                                 nuclei_df = pd.DataFrame(nuclei_findings)[["코드", "항목", "템플릿ID", "중요도", "상태"]]
                                 st.dataframe(nuclei_df, use_container_width=True, height=220)
                             else:
@@ -483,7 +490,10 @@ elif st.session_state.page == "check":
                         st.dataframe(
                             df.style
                                 .apply(highlight_vulnerable, axis=1)   # 행 배경
-                                .map(lambda x: "color:red; font-weight:bold;" if "취약" in str(x) else "color:green;",
+                                .map(
+                                    lambda x: "color:red; font-weight:bold;"
+                                    if "취약" in str(x)
+                                    else ("color:#8a6d3b; font-weight:bold;" if "점검불가" in str(x) else "color:green;"),
                                     subset=["상태"])
                                 .map(lambda x: "color:red;" if x == "상" else "color:orange;",
                                     subset=["중요도"]),
@@ -529,6 +539,7 @@ elif st.session_state.page == "check":
                             red_font = Font(color="FF0000", bold=True)
                             green_font = Font(color="008000")
                             orange_font = Font(color="FF8C00")
+                            brown_font = Font(color="8A6D3B", bold=True)
 
                             from openpyxl.styles import Border, Side
 
@@ -552,6 +563,8 @@ elif st.session_state.page == "check":
 
                                 elif status_cell.value == "양호":
                                     status_cell.font = green_font
+                                elif status_cell.value == "점검불가":
+                                    status_cell.font = brown_font
 
                                 if severity_cell.value == "상":
                                     severity_cell.font = red_font

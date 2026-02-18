@@ -31,6 +31,7 @@ def run_nuclei(target_ip, templates_dir: Path):
     ]
 
     findings = []
+    error_message = ""
 
     try:
         with subprocess.Popen(
@@ -53,14 +54,16 @@ def run_nuclei(target_ip, templates_dir: Path):
             process.wait()
 
             if process.returncode != 0:
-                error_output = process.stderr.read()
-                print("Nuclei error:", error_output)
+                error_output = process.stderr.read().strip()
+                if error_output:
+                    error_message = error_output
+                else:
+                    error_message = f"nuclei exited with non-zero code: {process.returncode}"
 
-        return findings
+        return findings, error_message
 
     except Exception as e:
-        print("Execution failed:", str(e))
-        return []
+        return [], str(e)
 
 def map_severity(nuclei_severity):
     """
@@ -117,7 +120,26 @@ def main():
         "started_at": started_at.isoformat()
     }, ensure_ascii=False))
 
-    nuclei_results = run_nuclei(target_ip, templates_dir)
+    nuclei_results, run_error = run_nuclei(target_ip, templates_dir)
+
+    if run_error:
+        finished_at = datetime.now()
+        print(json.dumps({
+            "source": "nuclei",
+            "record_type": "scan_meta",
+            "code": "NUC-ERR-RUN",
+            "item": "Nuclei 실행 실패",
+            "severity": "하",
+            "status": "점검불가",
+            "reason": run_error,
+            "templates_dir": str(templates_dir),
+            "templates_count": template_count,
+            "target": target_ip,
+            "started_at": started_at.isoformat(),
+            "finished_at": finished_at.isoformat(),
+            "duration_sec": round((finished_at - started_at).total_seconds(), 2)
+        }, ensure_ascii=False))
+        return
 
     if not nuclei_results:
         finished_at = datetime.now()
