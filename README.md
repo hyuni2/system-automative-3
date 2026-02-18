@@ -7,16 +7,17 @@
 - Ansible 기반 대시보드 제공으로 점검 결과 시각화
 
 ```
-## 폴더 구조 (src 상세)
+## 폴더 구조
 
+- `app.py` : 루트 실행용 Streamlit 엔트리포인트
 - `src/` : 프로젝트 주요 스크립트와 OS별 점검 모듈
     - `main.sh` : 사용자 메뉴 및 실행 진입점
     - `test.sh` : 통합 점검 실행 스크립트
     - `dashboard_0210/` : 대시보드 및 관련 리소스
         - `ansible.cfg` : Ansible 설정 파일
-        - `app.py` : 대시보드 웹 앱 메인 스크립트
         - `check_playbook.yml` : 점검용 Ansible 플레이북
         - `temp_inventory.ini` : 임시 인벤토리 파일
+        - `nuclei-templates/` : Nuclei 공식 템플릿 저장소 (로컬 클론)
         - `fonts/`, `history/`, `images/` : 대시보드 정적 자원 및 로그 저장소
         - `reports/` : 원격 호스트 점검 결과 저장
             - `192.168.2.139_result.txt`, `192.168.2.141_result.txt`, `192.168.2.147_result.txt` : 예시 리포트 파일
@@ -82,8 +83,10 @@ pip install -r requirements.txt
 # 4. Nuclei 자동 설치 (모든 단계를 자동으로 진행)
 sudo bash install-nuclei.sh
 
-# 5. 대시보드 실행
-cd src/dashboard_0210
+# 5. Nuclei 템플릿 동기화 (최초 1회)
+git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates.git src/dashboard_0210/nuclei-templates
+
+# 6. 대시보드 실행 (프로젝트 루트에서)
 streamlit run app.py
 ```
 
@@ -185,7 +188,8 @@ nuclei -version  # 전역 경로에서 실행 확인
 ### Streamlit 대시보드 시작
 
 ```bash
-cd src/dashboard_0210
+# 프로젝트 루트에서 실행
+cd ~/system-automative-3
 streamlit run app.py
 ```
 
@@ -213,7 +217,7 @@ sudo bash src/OS_Scripts/RHEL-family/Rocky10.sh
 sudo bash src/OS_Scripts/Debian-family/Ubuntu24.sh
 ```
 
-결과는 `Report/` 폴더에 자동 저장됩니다.
+결과는 `src/dashboard_0210/reports/` 폴더에 자동 저장됩니다.
 
 ---
 
@@ -223,8 +227,9 @@ sudo bash src/OS_Scripts/Debian-family/Ubuntu24.sh
 |------|------|------|
 | `main.sh` | `src/` | 사용자 메뉴 진입점 |
 | `test.sh` | `src/` | KISA 보안 점검 자동 실행 |
-| `app.py` | `src/dashboard_0210/` | Streamlit 대시보드 |
+| `app.py` | `./` | Streamlit 대시보드 실행 엔트리포인트 |
 | `nuclei_check.py` | `src/dashboard_0210/scripts/` | Nuclei 실행 래퍼 |
+| `nuclei-templates/` | `src/dashboard_0210/` | Nuclei 공식 템플릿 저장소(스캔 대상) |
 | `Rocky9.sh, Rocky10.sh` | `src/OS_Scripts/RHEL-family/` | RHEL 계열 점검 스크립트 |
 | `Ubuntu24.sh` | `src/OS_Scripts/Debian-family/` | Debian 계열 점검 스크립트 |
 
@@ -279,6 +284,16 @@ which nuclei  # 또는
 ls -l /usr/local/bin/nuclei  # 설치 위치 확인
 ```
 
+### ❌ `NUC-ERR-TEMPLATES` 또는 `점검불가(템플릿 경로)`
+
+**해결:**
+```bash
+cd ~/system-automative-3
+git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates.git src/dashboard_0210/nuclei-templates
+# 이미 클론되어 있으면 최신화
+git -C src/dashboard_0210/nuclei-templates pull
+```
+
 ### ❌ `Permission denied` 에러
 
 **해결:**
@@ -292,6 +307,6 @@ chmod +x src/OS_Scripts/**/*.sh
 
 ## 📝 추가 참고사항
 
-- **원격 호스트 점검**: `check_playbook.yml`에 대상 호스트를 등록한 후 Ansible로 실행하세요.
-- **결과 저장**: 점검 결과는 `reports/` 디렉토리에 자동 저장됩니다.
-- **로그 조회**: `history/` 디렉토리에서 과거 실행 로그를 확인할 수 있습니다.
+- **원격 호스트 점검**: `src/dashboard_0210/check_playbook.yml` 기준으로 Ansible이 실행됩니다.
+- **결과 저장**: 점검 결과는 `src/dashboard_0210/reports/` 디렉토리에 자동 저장됩니다.
+- **로그 조회**: `src/dashboard_0210/history/` 디렉토리에서 과거 실행 로그를 확인할 수 있습니다.
