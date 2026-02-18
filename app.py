@@ -6,6 +6,7 @@ import json
 import re
 import io
 import sys
+import shlex
 from streamlit_option_menu import option_menu
 import base64
 from pathlib import Path
@@ -321,8 +322,9 @@ elif st.session_state.page == "check":
         else:
             with result_center:
                 with st.status(f"🌐 {display_msg} 통합 진단 중 (OS + Nuclei)...", expanded=True) as status:
+                    cmd = ["ansible-playbook", "-i", str(inventory_path), str(playbook_path)]
                     result = subprocess.run(
-                        ["ansible-playbook", "-i", str(inventory_path), str(playbook_path)],
+                        cmd,
                         capture_output=True,
                         text=True
                     )
@@ -337,15 +339,21 @@ elif st.session_state.page == "check":
                     else:
                         status.update(label="❌ 진단 실패", state="error")
                         st.error("진단 실행 중 오류가 발생했습니다.")
-                        st.code(result.stderr)
+                        st.write(f"Return code: `{result.returncode}`")
+                        st.write("실행 명령어:")
+                        st.code(" ".join(shlex.quote(part) for part in cmd), language="bash")
 
-                        # 에러나면 주석 풀고 디버깅용으로 사용하새요 ~
-                        # st.write("Return Code:", result.returncode)
-                        # st.write("STDOUT:")
-                        # st.code(result.stdout)
+                        with st.expander("진단 디버그 로그 보기", expanded=True):
+                            st.write("Inventory 내용:")
+                            try:
+                                st.code(inventory_path.read_text(encoding="utf-8"))
+                            except Exception:
+                                st.code("(inventory 파일을 읽을 수 없습니다.)")
 
-                        # st.write("STDERR:")
-                        # st.code(result.stderr)
+                            st.write("STDOUT:")
+                            st.code(result.stdout if result.stdout.strip() else "(비어 있음)")
+                            st.write("STDERR:")
+                            st.code(result.stderr if result.stderr.strip() else "(비어 있음)")
 
     # =====================================================
     # RESULT REPORT (넓게)
