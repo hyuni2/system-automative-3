@@ -5,6 +5,7 @@ import pandas as pd
 import json
 import re
 import io
+import sys
 from streamlit_option_menu import option_menu
 import base64
 from pathlib import Path
@@ -18,20 +19,42 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-from datetime import datetime
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils.dataframe import dataframe_to_rows
-from datetime import datetime
 from openpyxl.utils import get_column_letter
 
 BASE_DIR = Path(__file__).resolve().parent
-REPORTS_DIR = BASE_DIR / "reports"
-HISTORY_DIR = BASE_DIR / "history"
-IMAGES_DIR = BASE_DIR / "images"
-CURRENT_DIR = BASE_DIR
+DASHBOARD_DIR = BASE_DIR / "src" / "dashboard_0210"
+
+# Ensure dashboard modules are importable when running from repo root
+if str(DASHBOARD_DIR) not in sys.path:
+    sys.path.insert(0, str(DASHBOARD_DIR))
+
+from scripts.nuclei_check import run_nuclei, map_severity
+
+REPORTS_DIR = DASHBOARD_DIR / "reports"
+HISTORY_DIR = DASHBOARD_DIR / "history"
+IMAGES_DIR = DASHBOARD_DIR / "images"
+SCRIPTS_DIR = DASHBOARD_DIR / "scripts"
+CURRENT_DIR = DASHBOARD_DIR
+CSS_PATH = DASHBOARD_DIR / "styles.css"
+TEMPLATES_DIR = DASHBOARD_DIR / "templates"
+NUCLEI_TEMPLATES_DIR = DASHBOARD_DIR / "nuclei-templates"
 
 # --------------------추가
+def load_local_css():
+    if CSS_PATH.exists():
+        css_text = CSS_PATH.read_text(encoding="utf-8")
+        st.markdown(f"<style>{css_text}</style>", unsafe_allow_html=True)
+
+
+def load_template(name: str) -> str:
+    path = TEMPLATES_DIR / name
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8")
+
 def cleanup_reports():
     import shutil
     report_dir = CURRENT_DIR / "reports"
@@ -42,6 +65,31 @@ def cleanup_reports():
             except:
                 pass
 #--------------------------
+def run_nuclei_from_dashboard(target_ip):
+    results = []
+    script_path = SCRIPTS_DIR / "nuclei_check.py"
+    try:
+        process = subprocess.Popen(
+            ["python3", str(script_path), target_ip, str(NUCLEI_TEMPLATES_DIR)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        for line in process.stdout:
+            line = line.strip()
+            if line.startswith("{") and line.endswith("}"):
+                try:
+                    results.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+
+        process.wait()
+
+    except Exception as e:
+        print("Nuclei 실행 실패:", str(e))
+
+    return results
 
 def save_df_to_docx(df: pd.DataFrame, save_path, target_ip: str):
     doc = Document()
@@ -89,442 +137,10 @@ st.set_page_config(
 
 if "page" not in st.session_state:
     st.session_state.page = "main"
+load_local_css()
 
-st.markdown("""
-<style>
-html, body {
-    height: 100%;
-}
-
-.block-container {
-    display: flex;
-    flex-direction: column;
-
-    padding-top: 0;
-    padding-left: 0;
-    padding-right: 0;
-    padding-bottom: 0 !important;
-    margin-bottom: 0 !important;
-}
-
-.hero-wrapper {
-    width: 100%;
-    margin-left: 0;
-}
-
-.hero {
-    position: relative;
-    width: 100%;
-    min-height: 95vh;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    background:
-        linear-gradient(
-            to right,
-            rgba(0,0,0,0.55) 0%,
-            rgba(0,0,0,0.65) 40%,
-            rgba(0,0,0,0.75) 100%
-        ),
-        url("https://images.unsplash.com/photo-1558494949-ef010cbdcc31");
-
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-
-    background-attachment: fixed;
-
-    transition: min-height 0.5s ease;
-}
-
-.hero-content {
-    position: relative;
-    z-index: 2;
-    max-width: 1000px;
-    text-align: center;
-    color: #ffffff;
-    padding: 0 24px;
-}
-
-.hero-content h1 {
-    font-size: clamp(44px, 4.5vw, 72px);
-    font-weight: 700;
-    letter-spacing: -1px;
-    margin-bottom: 16px;
-}
-
-.hero-content p {
-    font-size: clamp(18px, 1.3vw, 24px);
-    opacity: 0.9;
-    line-height: 1.7;
-}
-
-.hero.shrink {
-    min-height: 240px;
-}
-
-.hero.shrink .hero-content h1 {
-    font-size: 32px;
-}
-
-.hero.sidebar-open .hero-content {
-    transform: translate(calc(-50% + 160px), -50%);
-}
-
-.section {
-    max-width: 1100px;
-    margin: auto;
-    padding: 80px 20px 120px;
-}
-
-section[data-testid="stSidebar"] {
-    background-color: #f2f2f2;
-}
-
-.nav-link {
-    margin: 6px 8px;
-    padding: 10px 14px !important;
-
-    font-size: 16px;
-    color: #333 !important;
-    border-radius: 14px !important;
-}
-
-.nav-link:hover {
-    background-color: #e5e5e5 !important;
-}
-
-.nav-link.active,
-.nav-link-selected {
-    background-color: #dcdcdc !important;
-    color: #000 !important;
-    font-weight: 700 !important;
-}
-
-.nav-link i {
-    font-size: 18px;
-}
-
-button[data-testid="collapsedControl"] {
-    display: flex !important;
-    align-items: center;
-    gap: 6px;
-
-    padding: 6px 12px !important;
-    border-radius: 20px;
-
-    background-color: #f2f2f2;
-    color: #444;
-    font-weight: 600;
-}
-
-button[data-testid="collapsedControl"]::after {
-    content: "menu";
-    font-size: 14px;
-    letter-spacing: 0.5px;
-}
-
-button[data-testid="collapsedControl"]:hover {
-    background-color: #e0e0e0;
-}
-
-/* ===========================
-   ENTERPRISE DESIGN SYSTEM
-=========================== */
-
-body {
-    background-color: #f7f9fc;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
-
-/* HERO CTA */
-.hero-cta {
-    margin-top: 30px;
-    display: flex;
-    gap: 16px;
-    justify-content: center;
-}
-
-.cta-primary {
-    background: #ffffff;
-    color: #0b1220;
-    padding: 12px 22px;
-    border-radius: 10px;
-    font-weight: 700;
-    text-decoration: none;
-    transition: all .2s ease;
-}
-
-.cta-primary:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 16px 36px rgba(0,0,0,0.2);
-}
-
-.cta-outline {
-    border: 1px solid rgba(255,255,255,0.6);
-    color: #ffffff;
-    padding: 12px 22px;
-    border-radius: 10px;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all .2s ease;
-}
-
-.cta-outline:hover {
-    background: rgba(255,255,255,0.1);
-}
-
-/* SECTION TITLE */
-.section-title {
-    font-size: 38px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    margin-bottom: 28px;
-    color: #1f2937;
-    text-align: center;
-}
-
-.section-subtitle {
-    font-size: 18px;
-    line-height: 1.9;
-    color: #4b5563;
-    max-width: 900px;
-    text-align: center;
-    margin: 0 auto;
-}
-
-.section-subtitle strong {
-    color: #111827;
-    font-weight: 600;
-}
-
-.section-subtitle a {
-    color: #005BAC;
-    font-weight: 600;
-    text-decoration: none;
-}
-
-.section-subtitle a:hover {
-    text-decoration: underline;
-}
-
-/* KPI STRIP */
-.kpi-strip {
-    display: flex;
-    justify-content: space-between;
-    text-align: center;
-    margin-bottom: 80px;
-}
-
-.kpi-box h3 {
-    font-size: 34px;
-    font-weight: 700;
-    margin-bottom: 6px;
-}
-
-.kpi-box p {
-    font-size: 14px;
-    opacity: 0.6;
-}
-
-/* FEATURE GRID */
-.feature-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 30px;
-}
-
-.feature-card {
-    background: #ffffff;
-    border-radius: 16px;
-    padding: 32px;
-    box-shadow: 0 12px 32px rgba(0,0,0,0.06);
-    transition: all .25s ease;
-}
-
-.feature-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 20px 48px rgba(0,0,0,0.1);
-}
-
-.feature-card h4 {
-    font-size: 18px;
-    margin-bottom: 12px;
-    font-weight: 700;
-    position: relative;
-    padding-left: 14px;
-}
-
-.feature-card h4::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 4px;
-    width: 4px;
-    height: 18px;
-    background: #2563eb;
-    border-radius: 4px;
-}
-
-.feature-card p {
-    font-size: 15px;
-    opacity: 0.7;
-    line-height: 1.6;
-}
-
-/* RESPONSIVE */
-@media (max-width: 1200px) {
-    .feature-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-@media (max-width: 640px) {
-    .feature-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-.kpi-strip {
-    display: flex;
-    justify-content: space-between;
-    text-align: center;
-    margin-bottom: 80px;
-    border-top: 1px solid #e5e7eb;
-    border-bottom: 1px solid #e5e7eb;
-    padding: 40px 0;
-}
-
-.kpi-box:not(:last-child) {
-    border-right: 1px solid #e5e7eb;
-}
-
-</style>
-
-<style>
-section[data-testid="stAppViewContainer"] {
-    padding-bottom: 0 !important;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
-section[data-testid="stAppViewContainer"] > .block-container {
-    flex: 1;
-}
-
-section[data-testid="stMain"] {
-    padding-bottom: 0 !important;
-}
-</style>
-
-<style>
-/* CHECK PAGE – 카드 스타일 */
-.diagnosis-wrapper {
-    display: flex;
-    justify-content: center;
-    margin-top: 0 !important;
-}
-
-.diagnosis-card {
-    width: 100%;
-    max-width: 720px;
-    background-color: #f8f9fa;
-    padding: 32px 36px;
-    border-radius: 18px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.diagnosis-title {
-    text-align: center;
-    font-weight: 700;
-    margin-bottom: 8px;
-}
-
-.diagnosis-desc {
-    text-align: center;
-    opacity: 0.8;
-    line-height: 1.6;
-    margin-bottom: 28px;
-}
-</style>
-
-<style>
-.result-wrapper {
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-.result-wrapper [data-testid="stStatus"],
-.result-wrapper [data-testid="stAlert"] {
-    width: 100% !important;
-    max-width: 100% !important;
-}
-.about-wrapper {
-    margin-top: 120px;
-    padding: 80px 0;
-}
-
-.about-header h2 {
-    font-size: 32px;
-    margin-bottom: 8px;
-}
-
-.about-header p {
-    color: #777;
-    margin-bottom: 60px;
-}
-
-.team-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 40px;
-}
-
-.team-card {
-    padding: 28px 0;
-    border-top: 2px solid #111;
-    transition: all 0.3s ease;
-}
-
-.team-card:hover {
-    transform: translateY(-4px);
-}
-
-.team-name {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 6px;
-}
-
-.team-role {
-    font-size: 14px;
-    color: #555;
-    margin-bottom: 10px;
-}
-
-.team-email {
-    font-size: 14px;
-    color: #888;
-}
-
-</style>
-
-<style>
-/* download_button를 텍스트 링크처럼 */
-div[data-testid="stDownloadButton"] button {
-    all: unset;                /* 버튼 스타일 제거 */
-    cursor: pointer;
-    color: #2563eb;            /* 링크 블루 */
-    font-size: 15px;
-}
-
-div[data-testid="stDownloadButton"] button:hover {
-    text-decoration: underline;
-}
-</style>
-
+st.markdown(
+    """
 <script>
 const updateHeroState = () => {
     const hero = document.querySelector(".hero");
@@ -571,7 +187,9 @@ setTimeout(resetHero, 200);
 setTimeout(updateHeroState, 300);
 
 </script>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 # =========================================================
@@ -613,137 +231,14 @@ if st.session_state.page == "main":
      #--------------추가
     cleanup_reports()
     #------------------
-    
-    st.markdown("""
-    <div class="hero-wrapper">
-        <div class="hero">
-            <div class="hero-content">
-                <h1>플랫폼 이름</h1>
-                <p>
-                    by 치약좋지
-                </p>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-<div class="section" id="overview">
-    <div class="section-title">
-        Linux Vulnerability Diagnosis Automation Platform
-    </div>
-    <div style="
-        width: 400px;
-        height: 2px;
-        background: rgba(0, 91, 172, 0.35);
-        margin: 22px auto 40px auto;
-        border-radius: 2px;
-    "></div>
-    <div class="section-subtitle">
-        <br><br>본 플랫폼은 
-        <a href="https://www.kisa.or.kr/2060204/form?postSeq=22&page=1"
-        target="_blank">
-        KISA 주요정보통신기반시설 기술적 취약점 분석 상세 가이드(2026)
-        </a>
-        를 기준으로 설계된 <br><strong>엔터프라이즈 리눅스 취약점 진단 자동화 플랫폼</strong>입니다.<br><br>
-        수동 점검 중심의 비효율적인 운영 방식을 개선하고,
-        표준화된 정책 기반 진단 체계를 자동화하여<br>
-        조직 내 보안 수준을 일관되게 유지할 수 있도록 지원합니다.<br><br>
-        <strong>단일 서버부터 대규모 인프라 환경까지 확장 가능한 보안 점검 서비스</strong>를 제공합니다.<br><br><br><br>
-    </div>
-        <div class="feature-grid" id="features">
-            <div class="feature-card">
-                <h4>Single Server Assessment</h4>
-                <p>
-                IP 입력 기반 실시간 취약점 자동 진단.<br>
-                KISA 표준 항목 기반 정밀 점검 수행.
-                </p>
-            </div>
-            <div class="feature-card">
-                <h4>Bulk Server Inspection</h4>
-                <p>
-                CSV 업로드 기반 다수 서버 일괄 분석.<br>
-                운영 환경에 최적화된 대규모 자동 점검 수행.
-                </p>
-            </div>
-            <div class="feature-card">
-                <h4>Automated Reporting</h4>
-                <p>
-                진단 결과 자동 정리 및 Word 보고서 생성.<br>
-                감사 대응 및 문서화 지원.
-                </p>
-            </div>
-            <div class="feature-card">
-                <h4>CVE Intelligence Integration</h4>
-                <p>
-                설정 취약점 + 공개 취약점 동시 분석.<br>
-                정책 기반 진단과 실시간 위협 인텔리전스 결합.
-                </p>
-            </div>
-        </div>
-        <div class="about-wrapper">
-    <div class="about-header">
-        <h2>About Us</h2>
-    </div>
-    <div class="team-grid">
-        <div class="team-card">
-            <div class="team-name">송연수</div>
-            <div class="team-email">songyeonsu12@gmail.com</div>
-        </div>
-        <div class="team-card">
-            <div class="team-name">김연진</div>
-            <div class="team-email">kyj9750322@gmail.com</div>
-        </div>
-        <div class="team-card">
-            <div class="team-name">김태훈</div>
-            <div class="team-email">kevin9480@naver.com</div>
-        </div>
-        <div class="team-card">
-            <div class="team-name">이희윤</div>
-            <div class="team-email">youthgmldbs@gmail.com</div>
-        </div>
-        <div class="team-card">
-            <div class="team-name">조수진</div>
-            <div class="team-email">suujin1025@gmail.com</div>
-        </div>
-    </div>
-</div>
-</div>
-
-    """, unsafe_allow_html=True)
+    st.markdown(load_template("main.html"), unsafe_allow_html=True)
     
 elif st.session_state.page == "check":
 
     # ===============================
     # 배너
     # ===============================
-    st.markdown("""
-    <div style="
-        width: 100%;
-        overflow: hidden;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-        margin-bottom: 32px;
-    ">
-        <img src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b"
-             style="width:100%; height:220px; object-fit:cover;">
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ===============================
-    # DIAGNOSIS CARD
-    # ===============================
-    st.markdown("""
-    <div class="diagnosis-wrapper">
-        <div class="diagnosis-card">
-            <h3 class="diagnosis-title">⚙️ 취약점 진단</h3>
-            <div class="diagnosis-desc">
-            단일 서버에 대한 개별 진단과<br>
-            다중 서버에 대한 일괄 진단을 지원합니다.<br>
-            환경 규모에 따라 유연한 점검 방식을 선택할 수 있습니다.
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(load_template("check_intro.html"), unsafe_allow_html=True)
 
     st.markdown("<div style='height:80px'></div>", unsafe_allow_html=True)
 
@@ -753,44 +248,14 @@ elif st.session_state.page == "check":
     _, center, _ = st.columns([1, 3, 1])
     with center:
         # 탭 디자인 생성
-        tab1, tab2 = st.tabs(["🎯 개별 서버 진단", "📁 다중 서버 진단 (CSV)"])
-        st.markdown("""
-        <style>
-
-        /* 기본 탭 버튼 스타일 */
-        div[data-testid="stTabs"] button {
-            font-size: 18px !important;
-            font-weight: 700 !important;      /* 글자 굵게 */
-            padding: 14px 28px !important;
-            border-radius: 10px 10px 0 0 !important;
-            border-bottom: none !important;   /* 파란 밑줄 제거 */
-        }
-
-        /* Streamlit 기본 파란 슬라이드바 제거 */
-        div[data-testid="stTabs"] div[role="tablist"]::after {
-            display: none !important;
-        }
-
-        /* 선택된 탭 */
-        div[data-testid="stTabs"] button[aria-selected="true"] {
-            background-color: #f2f2f2 !important;   /* 회색 배경 */
-            color: #000 !important;
-        }
-
-        /* 선택되지 않은 탭 */
-        div[data-testid="stTabs"] button[aria-selected="false"] {
-            background-color: transparent !important;
-            color: #444 !important;
-        }
-
-        </style>
-        """, unsafe_allow_html=True)
-
+        tab1, tab2 = st.tabs(["🎯 개별 서버 진단 (OS + Nuclei)", "📁 다중 서버 진단 (OS + Nuclei)"])
         with tab1:
             target_ip = st.text_input("대상 서버 IP", placeholder="192.168.x.x", key="single_ip")
             ssh_user = st.text_input("SSH 계정", value="", key="single_user")
             ssh_pw = st.text_input("SSH 비밀번호", type="password", key="single_pw")
             uploaded_file = None # 탭1일 때는 업로드 파일 무시
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+            start_single_btn = st.button("🚀 통합 진단 시작 (OS + Nuclei)", use_container_width=True, key="start_single")
 
         with tab2:
             st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
@@ -801,13 +266,16 @@ elif st.session_state.page == "check":
                     st.dataframe(df_targets, use_container_width=True, height=150)
                 except Exception as e:
                     st.error(f"CSV 읽기 실패: {e}")
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+            start_bulk_btn = st.button("🚀 통합 진단 시작 (OS + Nuclei)", use_container_width=True, key="start_bulk")
 
-        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-        start_btn = st.button("🚀 진단 시작", use_container_width=True)
-
-        if start_btn:
-            st.session_state.pop("latest_result_ip", None)
-            st.session_state.pop("latest_result_df", None)
+    # 버튼 클릭 시 세션 초기화
+    if 'start_single_btn' in locals() and start_single_btn:
+        st.session_state.pop("latest_result_ip", None)
+        st.session_state.pop("latest_result_df", None)
+    if 'start_bulk_btn' in locals() and start_bulk_btn:
+        st.session_state.pop("latest_result_ip", None)
+        st.session_state.pop("latest_result_df", None)
 
     st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
     st.divider()
@@ -817,7 +285,16 @@ elif st.session_state.page == "check":
     # ===============================
     _, result_center, _ = st.columns([0.3, 6, 0.3])
 
-    if start_btn:
+    # 버튼 클릭 여부 확인
+    start_triggered = False
+    if 'start_single_btn' in locals() and start_single_btn:
+        start_triggered = True
+        is_single = True
+    elif 'start_bulk_btn' in locals() and start_bulk_btn:
+        start_triggered = True
+        is_single = False
+
+    if start_triggered:
         inventory_path = CURRENT_DIR / "temp_inventory.ini"
         playbook_path = CURRENT_DIR / "check_playbook.yml"
         
@@ -827,14 +304,14 @@ elif st.session_state.page == "check":
             f.write("[targets]\n")
             
             # CSV 파일이 업로드된 경우 (탭2)
-            if uploaded_file is not None:
+            if not is_single and uploaded_file is not None:
                 for _, row in df_targets.iterrows():
                     f.write(f"{row['ip']} ansible_user={row['user']} ansible_password={row['pw']} ansible_become_password={row['pw']}\n")
                 display_msg = "다중 서버"
                 valid_target = True
             
             # 개별 IP가 입력된 경우 (탭1)
-            elif target_ip:
+            elif is_single and target_ip:
                 f.write(f"{target_ip} ansible_user={ssh_user} ansible_password={ssh_pw} ansible_become_password={ssh_pw}\n")
                 display_msg = target_ip
                 valid_target = True
@@ -843,7 +320,7 @@ elif st.session_state.page == "check":
             st.error("진단 대상을 입력하거나 CSV 파일을 업로드해주세요!")
         else:
             with result_center:
-                with st.status(f"🌐 {display_msg} 진단 중...", expanded=True) as status:
+                with st.status(f"🌐 {display_msg} 통합 진단 중 (OS + Nuclei)...", expanded=True) as status:
                     result = subprocess.run(
                         ["ansible-playbook", "-i", str(inventory_path), str(playbook_path)],
                         capture_output=True,
@@ -851,12 +328,12 @@ elif st.session_state.page == "check":
                     )
 
                     if result.returncode == 0:
-                        status.update(label="✅ 진단 완료!", state="complete")
+                        status.update(label="✅ 통합 진단 완료!", state="complete")
                         # 단일 진단일 경우 바로 결과 세션 저장
-                        if uploaded_file is None:
+                        if is_single:
                             st.session_state["latest_result_ip"] = target_ip
                         st.balloons()
-                        st.success(f"🎉 {display_msg} 점검 성공!")
+                        st.success(f"🎉 {display_msg} 통합 점검 성공!")
                     else:
                         status.update(label="❌ 진단 실패", state="error")
                         st.error("진단 실행 중 오류가 발생했습니다.")
@@ -906,23 +383,45 @@ elif st.session_state.page == "check":
 
                 try:
                     parsed_results = []
+                    nuclei_findings = []
+                    nuclei_scan_meta = []
+
                     with open(report_path, "r", encoding="utf-8") as f:
                         for line in f:
                             line = line.strip()
                             # JSON 형태만 파싱
                             if line.startswith("{") and line.endswith("}"):
                                 data = json.loads(line)
-                                parsed_results.append({
+                                source = data.get("source", "")
+                                record_type = data.get("record_type", "")
+
+                                if source == "nuclei" and record_type == "scan_meta":
+                                    nuclei_scan_meta.append(data)
+                                    continue
+
+                                code = data.get("code", "")
+                                is_nuclei = (
+                                    source == "nuclei"
+                                    or str(code).startswith("NUC-")
+                                    or str(code).startswith("CVE-")
+                                )
+
+                                parsed_row = {
+                                    "분류": "Nuclei" if is_nuclei else "OS",
                                     "코드": data.get("code"),
                                     "중요도": data.get("severity"),
                                     "항목": data.get("item"),
                                     "상태": data.get("status"),
                                     "상세 사유": data.get("reason"),
-                                })
+                                    "템플릿ID": data.get("template_id", "-") if is_nuclei else "-",
+                                }
+                                parsed_results.append(parsed_row)
+                                if is_nuclei:
+                                    nuclei_findings.append(parsed_row)
 
                     if parsed_results:
                         df = pd.DataFrame(parsed_results)
-                        df = df[["코드", "중요도", "항목", "상태", "상세 사유"]]
+                        df = df[["분류", "코드", "중요도", "항목", "상태", "상세 사유", "템플릿ID"]]
 
                         df = df[df["코드"].notna()]
 
@@ -930,17 +429,51 @@ elif st.session_state.page == "check":
                             lambda x: 0 if "취약" in str(x) else 1
                         )
 
-                        df["U_NUM"] = df["코드"].str.extract(r'U-(\d+)').astype(int)
+                        # 취약 우선 + OS 먼저 + U- 계열 순서 정렬
+                        df["U_NUM"] = df["코드"].str.extract(r'U-(\d+)')
+                        df["U_NUM"] = pd.to_numeric(df["U_NUM"], errors="coerce").fillna(9999)
+                        df["TYPE_ORDER"] = df["분류"].apply(lambda x: 0 if str(x) == "OS" else 1)
 
                         df = df.sort_values(
-                            by=["STATUS_ORDER", "U_NUM"],
-                            ascending=[True, True]
+                            by=["STATUS_ORDER", "TYPE_ORDER", "U_NUM"],
+                            ascending=[True, True, True]
                         )
 
-                        df = df.drop(columns=["STATUS_ORDER", "U_NUM"])
+                        df = df.drop(columns=["STATUS_ORDER", "U_NUM", "TYPE_ORDER"])
                         df = df.reset_index(drop=True)
 
                         st.session_state["latest_result_df"] = df
+
+                        if nuclei_scan_meta:
+                            st.markdown("#### 🧪 Nuclei 템플릿 실행 결과")
+                            meta_templates_dir = next(
+                                (m.get("templates_dir") for m in nuclei_scan_meta if m.get("templates_dir")),
+                                str(NUCLEI_TEMPLATES_DIR)
+                            )
+                            meta_templates_count = next(
+                                (m.get("templates_count") for m in nuclei_scan_meta if m.get("templates_count") is not None),
+                                0
+                            )
+                            meta_duration = next(
+                                (m.get("duration_sec") for m in reversed(nuclei_scan_meta) if m.get("duration_sec") is not None),
+                                None
+                            )
+                            detected_count = len(nuclei_findings)
+
+                            st.caption(
+                                f"템플릿 경로: `{meta_templates_dir}` | "
+                                f"템플릿 수: `{meta_templates_count}` | "
+                                f"탐지 건수: `{detected_count}`"
+                                + (f" | 실행 시간: `{meta_duration}초`" if meta_duration is not None else "")
+                            )
+
+                            if nuclei_findings:
+                                nuclei_df = pd.DataFrame(nuclei_findings)[["코드", "항목", "템플릿ID", "중요도", "상태"]]
+                                st.dataframe(nuclei_df, use_container_width=True, height=220)
+                            else:
+                                st.info("Nuclei 템플릿 실행은 완료되었고 탐지된 취약점은 없습니다.")
+
+                            st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
                         def highlight_vulnerable(row):
                             if "취약" in str(row["상태"]):
@@ -973,12 +506,15 @@ elif st.session_state.page == "check":
                             ws = wb.active
                             ws.title = "Diagnosis Result"
 
-                            ws.merge_cells("A1:E1")
+                            col_count = len(df.columns)
+                            last_col_letter = get_column_letter(col_count)
+
+                            ws.merge_cells(f"A1:{last_col_letter}1")
                             ws["A1"] = f"{date_str} 취약점 점검 결과"
                             ws["A1"].font = Font(size=16, bold=True)
                             ws["A1"].alignment = Alignment(horizontal="center")
 
-                            ws.merge_cells("A2:E2")
+                            ws.merge_cells(f"A2:{last_col_letter}2")
                             ws["A2"] = f"대상 서버 : {recent_ip}"
                             ws["A2"].font = Font(size=12, bold=True)
                             ws["A2"].alignment = Alignment(horizontal="center")
@@ -998,10 +534,12 @@ elif st.session_state.page == "check":
 
                             thin = Side(style="thin")
                             border = Border(left=thin, right=thin, top=thin, bottom=thin)
+                            status_col_idx = df.columns.get_loc("상태")
+                            severity_col_idx = df.columns.get_loc("중요도")
 
                             for row in ws.iter_rows(min_row=start_row+1, max_row=ws.max_row):
-                                status_cell = row[3]
-                                severity_cell = row[1]
+                                status_cell = row[status_col_idx]
+                                severity_cell = row[severity_col_idx]
 
                                 # 모든 셀에 동일한 border 적용
                                 for cell in row:
@@ -1009,7 +547,8 @@ elif st.session_state.page == "check":
 
                                 if status_cell.value == "취약":
                                     for cell in row:
-                                        status_cell.font = red_font
+                                        cell.fill = vuln_fill
+                                    status_cell.font = red_font
 
                                 elif status_cell.value == "양호":
                                     status_cell.font = green_font
@@ -1051,48 +590,13 @@ elif st.session_state.page == "history":
     # ===============================
     # 배너
     # ===============================
-    st.markdown("""
-        <div style="
-            width: 100%;
-            overflow: hidden;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-            margin-bottom: 32px;
-        ">
-            <img src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b"
-                style="width:100%; height:220px; object-fit:cover;">
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # ===============================
-    # DIAGNOSIS CARD
-    # ===============================
-    st.markdown("""
-    <div class="diagnosis-wrapper">
-        <div class="diagnosis-card">
-            <h3 class="diagnosis-title">⚙️ 진단 결과</h3>
-            <div class="diagnosis-desc">
-                저장된 진단 결과를 보관합니다.
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(load_template("history_intro.html"), unsafe_allow_html=True)
     st.markdown("<div style='height:80px'></div>", unsafe_allow_html=True)
 
     _, center, _ = st.columns([1, 3, 1])
 
     with center:
-        st.markdown(
-            """
-            <div style="
-                font-size: 20px;
-                font-weight: 500;
-                margin-bottom: 12px;
-            ">
-                📂 보관함
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        st.markdown("#### 📂 보관함")
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         HISTORY_DIR = CURRENT_DIR / "history"
         HISTORY_DIR.mkdir(exist_ok=True)
@@ -1151,32 +655,6 @@ elif st.session_state.page == "history":
 # footer
 # =========================================================
 st.markdown(f"""
-<style>
-.app-footer {{
-    width: 100%;
-    margin-top: auto;
-    margin-bottom: 0 !important;
-    padding: 12px 0;
-    border-top: 1px solid #e5e5e5;
-    background-color: #ffffff;
-}}
-
-.footer-inner {{
-    max-width: 1100px;
-    margin: auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 48px;
-}}
-
-.footer-inner img {{
-    height: 48px;
-    object-fit: contain;
-    opacity: 0.9;
-}}
-</style>
-
 <div class="app-footer">
     <div class="footer-inner">
         <img src="data:image/png;base64,{RAPA_LOGO}" alt="RAPA">

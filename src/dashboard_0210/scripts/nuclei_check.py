@@ -2,8 +2,20 @@ import sys
 import subprocess
 import json
 import shutil
+from pathlib import Path
+from datetime import datetime
 
-def run_nuclei(target_ip):
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_TEMPLATES_DIR = SCRIPT_DIR.parent / "nuclei-templates"
+
+def count_template_files(template_root: Path) -> int:
+    if not template_root.exists():
+        return 0
+    return sum(1 for p in template_root.rglob("*") if p.suffix in {".yaml", ".yml"})
+
+
+def run_nuclei(target_ip, templates_dir: Path):
     nuclei_path = shutil.which("nuclei")
     if not nuclei_path:
         raise RuntimeError("Nuclei not found in PATH")
@@ -11,6 +23,7 @@ def run_nuclei(target_ip):
     cmd = [
         nuclei_path,
         "-u", target_ip,
+        "-t", str(templates_dir),
         "-json",
         "-silent",
         "-rate-limit", "50",
@@ -68,12 +81,64 @@ def main():
         sys.exit(1)
 
     target_ip = sys.argv[1]
-    nuclei_results = run_nuclei(target_ip)
+    templates_dir = DEFAULT_TEMPLATES_DIR
+    if len(sys.argv) >= 3:
+        templates_dir = Path(sys.argv[2]).expanduser().resolve()
+
+    started_at = datetime.now()
+    template_count = count_template_files(templates_dir)
+
+    if not templates_dir.exists():
+        print(json.dumps({
+            "source": "nuclei",
+            "record_type": "scan_meta",
+            "code": "NUC-ERR-TEMPLATES",
+            "item": "Nuclei 템플릿 경로 확인",
+            "severity": "하",
+            "status": "점검불가",
+            "reason": f"템플릿 경로가 존재하지 않습니다: {templates_dir}",
+            "templates_dir": str(templates_dir),
+            "templates_count": 0,
+            "target": target_ip
+        }, ensure_ascii=False))
+        sys.exit(1)
+
+    print(json.dumps({
+        "source": "nuclei",
+        "record_type": "scan_meta",
+        "code": "NUC-SCAN-INFO",
+        "item": "Nuclei 템플릿 스캔 시작",
+        "severity": "하",
+        "status": "정보",
+        "reason": f"템플릿 {template_count}개를 대상으로 스캔을 시작합니다.",
+        "templates_dir": str(templates_dir),
+        "templates_count": template_count,
+        "target": target_ip,
+        "started_at": started_at.isoformat()
+    }, ensure_ascii=False))
+
+    nuclei_results = run_nuclei(target_ip, templates_dir)
 
     if not nuclei_results:
-        print("[Nuclei] 취약점이 발견되지 않았습니다.")
+        finished_at = datetime.now()
+        print(json.dumps({
+            "source": "nuclei",
+            "record_type": "scan_meta",
+            "code": "NUC-NO-FINDING",
+            "item": "Nuclei 탐지 결과",
+            "severity": "하",
+            "status": "양호",
+            "reason": "탐지된 취약점이 없습니다.",
+            "templates_dir": str(templates_dir),
+            "templates_count": template_count,
+            "target": target_ip,
+            "started_at": started_at.isoformat(),
+            "finished_at": finished_at.isoformat(),
+            "duration_sec": round((finished_at - started_at).total_seconds(), 2)
+        }, ensure_ascii=False))
         return
 
+    finding_count = 0
     for res in nuclei_results:
         template_id = res.get("template-id", "NUCLEI-UNKNOWN")
         info = res.get("info", {})
@@ -99,16 +164,39 @@ def main():
             reason += f" ({matcher_name})"
 
         output = {
+            "source": "nuclei",
+            "record_type": "finding",
             "code": code,
             "item": name,
             "severity": severity,
             "severity_raw": severity_raw,
             "cvss_score": cvss_score,
             "status": "취약",
-            "reason": reason
+            "reason": reason,
+            "template_id": template_id,
+            "template_path": res.get("template-path", ""),
+            "matched_at": res.get("matched-at", "")
         }
-
+        finding_count += 1
         print(json.dumps(output, ensure_ascii=False))
+
+    finished_at = datetime.now()
+    print(json.dumps({
+        "source": "nuclei",
+        "record_type": "scan_meta",
+        "code": "NUC-SCAN-END",
+        "item": "Nuclei 템플릿 스캔 완료",
+        "severity": "하",
+        "status": "정보",
+        "reason": f"총 {finding_count}건의 탐지가 발생했습니다.",
+        "templates_dir": str(templates_dir),
+        "templates_count": template_count,
+        "finding_count": finding_count,
+        "target": target_ip,
+        "started_at": started_at.isoformat(),
+        "finished_at": finished_at.isoformat(),
+        "duration_sec": round((finished_at - started_at).total_seconds(), 2)
+    }, ensure_ascii=False))
 
 if __name__ == "__main__":
     main()

@@ -33,15 +33,19 @@
 ## 실행 흐름
 
 ```
-main.sh (사용자 메뉴 선택)
-    ↓
-test.sh (자동 OS 감지 & KISA 점검 실행)
-    ↓
-Report/KISA_RESULT_*.txt (결과 저장)
-```
-
-## 주요 파일 설명# 프로젝트 내 스크립트 실행
-./install-nuclei.sh
+1. Ansible Playbook 실행
+   ↓
+2. OS 점검 (67개 항목) 실행
+   - Ubuntu: Ubuntu24.sh
+   - Rocky 9: Rocky9.sh  
+   - Rocky 10: Rocky10.sh
+   ↓
+3. Nuclei 점검 자동 실행 (playbook 내 포함)
+   ↓
+4. reports/{ip}_result.txt 에 통합 결과 저장
+   (OS JSON + Nuclei JSON 형식)
+   ↓
+5. 대시보드가 JSON 파싱 → 표 형태로 표시
 
 | 파일 | 역할 |
 |------|------|
@@ -70,6 +74,7 @@ cd system-automative-3
 # 2. Python 가상환경 설정
 python3 -m venv venv
 source venv/bin/activate
+pip install --upgrade pip
 
 # 3. Python 패키지 설치
 pip install -r requirements.txt
