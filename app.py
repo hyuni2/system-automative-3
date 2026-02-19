@@ -7,6 +7,7 @@ import re
 import io
 import sys
 import shlex
+from typing import List
 from streamlit_option_menu import option_menu
 import base64
 from pathlib import Path
@@ -77,6 +78,15 @@ def execute_nuclei_command(command_text: str):
     if not cmd or cmd[0] != "nuclei":
         return None, "보안을 위해 nuclei 명령어만 실행할 수 있습니다."
 
+    include_args: List[str] = []
+    for i, token in enumerate(cmd[:-1]):
+        if token in {"-t", "-templates"}:
+            tpl_value = cmd[i + 1]
+            if "/" in tpl_value and "-it" not in cmd and "-include-templates" not in cmd:
+                include_args.extend(["-it", tpl_value])
+    if include_args:
+        cmd.extend(include_args)
+
     if "-j" not in cmd and "-jsonl" not in cmd:
         cmd.append("-j")
     if "-silent" not in cmd:
@@ -113,7 +123,32 @@ def execute_nuclei_command(command_text: str):
         "stderr": proc.stderr or "",
         "json": parsed_json,
         "non_json_lines": non_json_lines,
+        "include_args_added": include_args,
     }, None
+
+
+def summarize_nuclei_error(stderr_text: str, returncode: int) -> str:
+    if not (stderr_text or "").strip():
+        if returncode == 0:
+            return "실행 성공(탐지 결과 없음)"
+        return f"nuclei 실행 실패 (rc={returncode})"
+
+    cleaned = re.sub(r"\x1b\[[0-9;]*m", "", stderr_text)
+    lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+    if not lines:
+        if returncode == 0:
+            return "실행 성공(탐지 결과 없음)"
+        return f"nuclei 실행 실패 (rc={returncode})"
+
+    for line in reversed(lines):
+        lower = line.lower()
+        if "could not run nuclei:" in lower:
+            return line.split(":", 1)[1].strip() if ":" in line else line
+        if "error" in lower or "failed" in lower or "no templates" in lower:
+            return line
+    if returncode == 0:
+        return "실행 성공(탐지 결과 없음)"
+    return lines[-1]
 
 def save_df_to_docx(df: pd.DataFrame, save_path, target_ip: str):
     doc = Document()
@@ -222,7 +257,7 @@ setTimeout(updateHeroState, 300);
 with st.sidebar:
     selected = option_menu(
         menu_title=None,
-        options=["main", "점검", "nuclei", "기록"],
+        options=["main", "점검", "취약점스캐너", "기록"],
         icons=["star-fill", "shield-check", "search", "clock-history"],
         menu_icon="list",
         default_index=0,
@@ -243,7 +278,7 @@ with st.sidebar:
     page_map = {
         "main": "main",
         "점검": "check",
-        "nuclei": "nuclei",
+        "취약점스캐너": "nuclei",
         "기록": "history",
     }
 
@@ -668,11 +703,13 @@ elif st.session_state.page == "nuclei":
     st.markdown("## 🧪 Nuclei 스캔")
     st.caption("Nuclei 명령어를 대시보드에서 로컬 실행하고 결과를 JSON으로 확인합니다.")
 
-    st.markdown("### 1) 자동 스캔")
+    st.markdown("### [1] 자동 스캔 (일반 사용자용)")
     auto_target = st.text_input(
         "스캔 대상",
-        value="127.0.0.1",
-        help="웹 스캔은 URL(예: https://example.com), 로컬 감사는 호스트/IP를 입력하세요.",
+        placeholder=(
+            "예) ssh user@192.168.0.1\n\n"
+        ),
+        help="웹 스캔은 URL(예: https://example.com), 로컬 감사는 호스트/IP를 입력하세요.네트워크 스캔은 IP 또는 CIDR 입력 가능 (예: 192.168.0.1/24)",
         key="nuclei_auto_target",
     )
     auto_mode = st.selectbox(
@@ -773,26 +810,33 @@ elif st.session_state.page == "nuclei":
             else:
                 st.session_state["nuclei_last_result"] = result
                 if result.get("returncode", 1) == 0:
-                    st.success("Nuclei 자동 스캔이 완료되었습니다.")
+                    st.success("Nuclei 자동 스캔이 완료되었습니다.\n 아래 `실행 결과` 섹션에서 로그를 확인하세요.")
                 else:
                     st.warning(f"Nuclei 실행은 끝났지만 오류 코드가 반환되었습니다. (rc={result.get('returncode')})")
-                st.info("아래 `실행 결과` 섹션에서 JSON/로그를 확인하세요.")
 
     st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
-    st.markdown("### 2) 명령어 직접 실행")
+    st.markdown("### [2] 명령어 직접 실행 (고급 사용자용)")
     st.caption("입력한 명령어를 로컬 터미널처럼 실행합니다. 보안을 위해 `nuclei` 명령어만 허용됩니다.")
-    st.code(
-        "사용 예시:\n"
-        "nuclei -u https://example.com -t src/dashboard_0210/nuclei-templates/http/cves -severity critical,high\n"
-        "nuclei -target 127.0.0.1 -t src/dashboard_0210/nuclei-templates/code/linux/audit -code -esc",
-        language="bash",
+    st.markdown("#### 프로토콜(템플릿)별 사용 예시")
+    st.markdown(
+        "\n".join([
+            "- HTTP CVE: `nuclei -u [URL_TARGET] -t [HTTP_CVE_TEMPLATE] [HTTP옵션] -severity [critical,high,medium]`",
+            "- HTTP Misconfig: `nuclei -u [URL_TARGET] -t [HTTP_MISCONFIG_TEMPLATE] [HTTP옵션] -severity [medium,high]`",
+            "- Network: `nuclei -target [HOST_OR_IP] -t [NETWORK_TEMPLATE] [네트워크옵션] -severity [low,medium,high]`",
+            "- SSL/TLS: `nuclei -u [HTTPS_URL] -t [SSL_TEMPLATE] [TLS옵션] -severity [low,medium,high]`",
+            "- Linux Audit(Code): `nuclei -target [HOST_OR_PATH] -t [LINUX_AUDIT_TEMPLATE] -code -esc -severity [low,medium,high,critical]`",
+            "- Script Path(요청 형식): `nuclei -target [SCRIPT_PATH] -t [LINUX_AUDIT_TEMPLATE] -code -esc -severity [low,medium,high,critical]`",
+        ])
     )
-    manual_cmd = st.text_input(
+    manual_cmd = st.text_area(
         "Nuclei 명령어",
-        placeholder="nuclei -u https://target -t src/dashboard_0210/nuclei-templates/http/cves -severity critical,high",
+        placeholder=(
+            "예) nuclei  -target  [타겟경로/호스트]  -t  [템플릿경로]  [옵션]  -severity  [심각도]\n\n"
+        ),
         key="nuclei_manual_cmd",
+        height=120,
     )
-    if st.button("▶ 명령어 실행", use_container_width=True, key="nuclei_manual_run"):
+    if st.button("🚀 명령어 실행", use_container_width=True, key="nuclei_manual_run"):
         result, err = execute_nuclei_command(manual_cmd)
         if err:
             st.error(err)
@@ -805,7 +849,8 @@ elif st.session_state.page == "nuclei":
         st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
         st.markdown("### 실행 결과")
         st.write(f"Return code: `{result['returncode']}`")
-        st.code(" ".join(shlex.quote(token) for token in result["cmd"]), language="bash")
+        if result.get("include_args_added"):
+            st.caption(f"템플릿 로딩 안정화를 위해 자동 보정 인자 추가: `{result['include_args_added']}`")
         st.caption(
             f"JSON 건수: `{len(result.get('json', []))}` | "
             f"STDOUT 라인: `{len((result.get('stdout') or '').splitlines())}` | "
@@ -823,20 +868,30 @@ elif st.session_state.page == "nuclei":
 
         if result["json"]:
             st.caption(f"JSON 결과 {len(result['json'])}건")
+            table_rows = []
+            for item in result["json"]:
+                info = item.get("info", {})
+                table_rows.append({
+                    "template-id": item.get("template-id", "-"),
+                    "severity": info.get("severity", item.get("severity", "-")),
+                    "name": info.get("name", "-"),
+                    "matched-at": item.get("matched-at", "-"),
+                })
+            if table_rows:
+                st.dataframe(pd.DataFrame(table_rows), use_container_width=True, height=260)
             st.json(result["json"])
         else:
-            st.info("JSON 결과가 없습니다. 아래 원문 로그(STDOUT/STDERR)를 확인하세요.")
-
-        if result["non_json_lines"]:
-            with st.expander("STDOUT 원문 로그", expanded=True):
-                st.code("\n".join(result["non_json_lines"]))
-        elif (result.get("stdout") or "").strip():
-            with st.expander("STDOUT 원문 로그", expanded=True):
-                st.code(result["stdout"])
-
-        if result["stderr"].strip():
-            with st.expander("STDERR 로그", expanded=True):
-                st.code(result["stderr"])
+            reason = summarize_nuclei_error(result.get("stderr", ""), result.get("returncode", 1))
+            if result.get("returncode") == 0:
+                st.success(f"실행 성공했으나 탐지된 취약점이 없습니다. ({reason})")
+            else:
+                st.warning(f"JSON 결과가 없습니다. 사유: {reason}")
+            st.json({
+                "status": "no_json_or_no_findings",
+                "reason": reason,
+                "returncode": result.get("returncode"),
+                "executed_command": result.get("cmd"),
+            })
 
 # =========================================================
 # HISTORY PAGE
