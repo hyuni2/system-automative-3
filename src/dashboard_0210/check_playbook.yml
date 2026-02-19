@@ -39,13 +39,6 @@
         - ansible_facts["distribution_major_version"] | string == "10"
       ignore_errors: yes
 
-    # Nuclei Scan (Run on Control Node)
-    - name: Run Nuclei Vulnerability Scan
-      delegate_to: localhost
-      command: "python3 {{ playbook_dir }}/scripts/nuclei_check.py {{ inventory_hostname }} {{ playbook_dir }}/nuclei-templates"
-      register: nuclei_result
-      ignore_errors: yes
-
     - name: Save Diagnosis Report to Local
       delegate_to: localhost
       copy:
@@ -58,11 +51,7 @@
           {{ rocky10_result.stdout }}
           {% endif %}
 
-          {% if nuclei_result.stdout is defined and nuclei_result.stdout|trim != "" %}
-          {{ nuclei_result.stdout }}
-          {% endif %}
-
-          {% if (ubuntu_result.stdout is defined and ubuntu_result.stdout|trim != "") or (rocky9_result.stdout is defined and rocky9_result.stdout|trim != "") or (rocky10_result.stdout is defined and rocky10_result.stdout|trim != "") or (nuclei_result.stdout is defined and nuclei_result.stdout|trim != "") %}
+          {% if (ubuntu_result.stdout is defined and ubuntu_result.stdout|trim != "") or (rocky9_result.stdout is defined and rocky9_result.stdout|trim != "") or (rocky10_result.stdout is defined and rocky10_result.stdout|trim != "") %}
           {% else %}
           진단 스크립트 실행 결과가 비어있습니다.
           {% endif %}

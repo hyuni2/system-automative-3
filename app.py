@@ -32,8 +32,6 @@ DASHBOARD_DIR = BASE_DIR / "src" / "dashboard_0210"
 if str(DASHBOARD_DIR) not in sys.path:
     sys.path.insert(0, str(DASHBOARD_DIR))
 
-from scripts.nuclei_check import run_nuclei, map_severity
-
 REPORTS_DIR = DASHBOARD_DIR / "reports"
 HISTORY_DIR = DASHBOARD_DIR / "history"
 IMAGES_DIR = DASHBOARD_DIR / "images"
@@ -66,31 +64,56 @@ def cleanup_reports():
             except:
                 pass
 #--------------------------
-def run_nuclei_from_dashboard(target_ip):
-    results = []
-    script_path = SCRIPTS_DIR / "nuclei_check.py"
+def execute_nuclei_command(command_text: str):
+    command_text = (command_text or "").strip()
+    if not command_text:
+        return None, "명령어를 입력해주세요."
+
     try:
-        process = subprocess.Popen(
-            ["python3", str(script_path), target_ip, str(NUCLEI_TEMPLATES_DIR)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+        cmd = shlex.split(command_text)
+    except ValueError as e:
+        return None, f"명령어 파싱 오류: {e}"
+
+    if not cmd or cmd[0] != "nuclei":
+        return None, "보안을 위해 nuclei 명령어만 실행할 수 있습니다."
+
+    if "-j" not in cmd and "-jsonl" not in cmd:
+        cmd.append("-j")
+    if "-silent" not in cmd:
+        cmd.append("-silent")
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=3600,
+            cwd=str(CURRENT_DIR),
         )
-
-        for line in process.stdout:
-            line = line.strip()
-            if line.startswith("{") and line.endswith("}"):
-                try:
-                    results.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-
-        process.wait()
-
+    except subprocess.TimeoutExpired:
+        return None, "명령어 실행 시간이 1시간을 초과했습니다."
     except Exception as e:
-        print("Nuclei 실행 실패:", str(e))
+        return None, f"nuclei 실행 중 오류: {e}"
 
-    return results
+    parsed_json = []
+    non_json_lines = []
+    for raw_line in (proc.stdout or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            parsed_json.append(json.loads(line))
+        except json.JSONDecodeError:
+            non_json_lines.append(line)
+
+    return {
+        "cmd": cmd,
+        "returncode": proc.returncode,
+        "stdout": proc.stdout or "",
+        "stderr": proc.stderr or "",
+        "json": parsed_json,
+        "non_json_lines": non_json_lines,
+    }, None
 
 def save_df_to_docx(df: pd.DataFrame, save_path, target_ip: str):
     doc = Document()
@@ -199,8 +222,8 @@ setTimeout(updateHeroState, 300);
 with st.sidebar:
     selected = option_menu(
         menu_title=None,
-        options=["main", "점검", "기록"],
-        icons=["star-fill", "shield-check", "clock-history"],
+        options=["main", "점검", "nuclei", "기록"],
+        icons=["star-fill", "shield-check", "search", "clock-history"],
         menu_icon="list",
         default_index=0,
         styles={
@@ -220,6 +243,7 @@ with st.sidebar:
     page_map = {
         "main": "main",
         "점검": "check",
+        "nuclei": "nuclei",
         "기록": "history",
     }
 
@@ -249,14 +273,14 @@ elif st.session_state.page == "check":
     _, center, _ = st.columns([1, 3, 1])
     with center:
         # 탭 디자인 생성
-        tab1, tab2 = st.tabs(["🎯 개별 서버 진단 (OS + Nuclei)", "📁 다중 서버 진단 (OS + Nuclei)"])
+        tab1, tab2 = st.tabs(["🎯 개별 서버 진단 (OS)", "📁 다중 서버 진단 (OS)"])
         with tab1:
             target_ip = st.text_input("대상 서버 IP", placeholder="192.168.x.x", key="single_ip")
             ssh_user = st.text_input("SSH 계정", value="", key="single_user")
             ssh_pw = st.text_input("SSH 비밀번호", type="password", key="single_pw")
             uploaded_file = None # 탭1일 때는 업로드 파일 무시
             st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-            start_single_btn = st.button("🚀 통합 진단 시작 (OS + Nuclei)", use_container_width=True, key="start_single")
+            start_single_btn = st.button("🚀 OS 진단 시작", use_container_width=True, key="start_single")
 
         with tab2:
             st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
@@ -268,7 +292,7 @@ elif st.session_state.page == "check":
                 except Exception as e:
                     st.error(f"CSV 읽기 실패: {e}")
             st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-            start_bulk_btn = st.button("🚀 통합 진단 시작 (OS + Nuclei)", use_container_width=True, key="start_bulk")
+            start_bulk_btn = st.button("🚀 OS 진단 시작", use_container_width=True, key="start_bulk")
 
     # 버튼 클릭 시 세션 초기화
     if 'start_single_btn' in locals() and start_single_btn:
@@ -321,7 +345,7 @@ elif st.session_state.page == "check":
             st.error("진단 대상을 입력하거나 CSV 파일을 업로드해주세요!")
         else:
             with result_center:
-                with st.status(f"🌐 {display_msg} 통합 진단 중 (OS + Nuclei)...", expanded=True) as status:
+                with st.status(f"🌐 {display_msg} OS 진단 중...", expanded=True) as status:
                     cmd = ["ansible-playbook", "-i", str(inventory_path), str(playbook_path)]
                     try:
                         result = subprocess.run(
@@ -343,14 +367,14 @@ elif st.session_state.page == "check":
                         result = None
 
                     if result is not None and result.returncode == 0:
-                        status.update(label="✅ 통합 진단 완료!", state="complete")
+                        status.update(label="✅ OS 진단 완료!", state="complete")
                         # 단일 진단일 경우 바로 결과 세션 저장
                         if is_single:
                             st.session_state["latest_result_ip"] = target_ip
                         st.balloons()
-                        st.success(f"🎉 {display_msg} 통합 점검 성공!")
+                        st.success(f"🎉 {display_msg} OS 점검 성공!")
                     elif result is not None:
-                        status.update(label="❌ 진단 실패", state="error")
+                        status.update(label="❌ OS 진단 실패", state="error")
                         st.error("진단 실행 중 오류가 발생했습니다.")
                         st.write(f"Return code: `{result.returncode}`")
                         st.write("실행 명령어:")
@@ -636,6 +660,183 @@ elif st.session_state.page == "check":
 
                 except Exception as e:
                     st.error(f"리포트 처리 중 오류 발생: {e}") 
+
+# =========================================================
+# NUCLEI PAGE
+# =========================================================
+elif st.session_state.page == "nuclei":
+    st.markdown("## 🧪 Nuclei 스캔")
+    st.caption("Nuclei 명령어를 대시보드에서 로컬 실행하고 결과를 JSON으로 확인합니다.")
+
+    st.markdown("### 1) 자동 스캔")
+    auto_target = st.text_input(
+        "스캔 대상",
+        value="127.0.0.1",
+        help="웹 스캔은 URL(예: https://example.com), 로컬 감사는 호스트/IP를 입력하세요.",
+        key="nuclei_auto_target",
+    )
+    auto_mode = st.selectbox(
+        "스캔 모드",
+        [
+            "웹 기본 스캔 (http/cves + http/misconfiguration)",
+            "웹 확장 스캔 (http/vulnerabilities + exposures + default-logins + takeovers)",
+            "네트워크 스캔 (network/cves + exposures + vulnerabilities)",
+            "DNS/SSL 스캔 (dns + ssl)",
+            "Linux 로컬 감사 스캔 (code/linux/audit)",
+            "코드 취약점 스캔 (code/cves + code/misconfiguration)",
+            "DAST 스캔 (dast/cves + dast/vulnerabilities)",
+            "전체 템플릿 스캔 (느림)",
+        ],
+        key="nuclei_auto_mode",
+    )
+    sev_list = st.multiselect(
+        "중요도 필터",
+        options=["critical", "high", "medium", "low", "info"],
+        default=["critical", "high", "medium"],
+        key="nuclei_auto_severity",
+    )
+
+    if st.button("🚀 자동 스캔 실행", use_container_width=True, key="nuclei_auto_run"):
+        if not auto_target.strip():
+            st.error("스캔 대상을 입력해주세요.")
+        else:
+            severity_arg = ",".join(sev_list) if sev_list else "critical,high,medium,low,info"
+            target_q = shlex.quote(auto_target.strip())
+            http_cves = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "http" / "cves"))
+            http_mis = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "http" / "misconfiguration"))
+            http_vuln = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "http" / "vulnerabilities"))
+            http_exposures = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "http" / "exposures"))
+            http_default_logins = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "http" / "default-logins"))
+            http_takeovers = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "http" / "takeovers"))
+
+            network_cves = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "network" / "cves"))
+            network_exposures = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "network" / "exposures"))
+            network_vuln = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "network" / "vulnerabilities"))
+
+            dns_templates = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "dns"))
+            ssl_templates = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "ssl"))
+
+            linux_audit = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "code" / "linux" / "audit"))
+            code_cves = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "code" / "cves"))
+            code_misconfig = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "code" / "misconfiguration"))
+
+            dast_cves = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "dast" / "cves"))
+            dast_vuln = shlex.quote(str(NUCLEI_TEMPLATES_DIR / "dast" / "vulnerabilities"))
+            templates_root = shlex.quote(str(NUCLEI_TEMPLATES_DIR))
+
+            if auto_mode == "웹 기본 스캔 (http/cves + http/misconfiguration)":
+                auto_cmd = (
+                    f"nuclei -u {target_q} -t {http_cves} -t {http_mis} "
+                    f"-severity {severity_arg} -rate-limit 50 -timeout 10"
+                )
+            elif auto_mode == "웹 확장 스캔 (http/vulnerabilities + exposures + default-logins + takeovers)":
+                auto_cmd = (
+                    f"nuclei -u {target_q} -t {http_vuln} -t {http_exposures} "
+                    f"-t {http_default_logins} -t {http_takeovers} "
+                    f"-severity {severity_arg} -rate-limit 50 -timeout 10"
+                )
+            elif auto_mode == "네트워크 스캔 (network/cves + exposures + vulnerabilities)":
+                auto_cmd = (
+                    f"nuclei -target {target_q} -t {network_cves} -t {network_exposures} "
+                    f"-t {network_vuln} -severity {severity_arg} -rate-limit 50 -timeout 10"
+                )
+            elif auto_mode == "DNS/SSL 스캔 (dns + ssl)":
+                auto_cmd = (
+                    f"nuclei -target {target_q} -t {dns_templates} -t {ssl_templates} "
+                    f"-severity {severity_arg} -rate-limit 50 -timeout 10"
+                )
+            elif auto_mode == "Linux 로컬 감사 스캔 (code/linux/audit)":
+                auto_cmd = (
+                    f"nuclei -target {target_q} -t {linux_audit} "
+                    f"-code -esc -severity {severity_arg} -timeout 10"
+                )
+            elif auto_mode == "코드 취약점 스캔 (code/cves + code/misconfiguration)":
+                auto_cmd = (
+                    f"nuclei -target {target_q} -t {code_cves} -t {code_misconfig} "
+                    f"-code -esc -severity {severity_arg} -timeout 10"
+                )
+            elif auto_mode == "DAST 스캔 (dast/cves + dast/vulnerabilities)":
+                auto_cmd = (
+                    f"nuclei -u {target_q} -t {dast_cves} -t {dast_vuln} "
+                    f"-dast -severity {severity_arg} -rate-limit 50 -timeout 10"
+                )
+            else:
+                auto_cmd = (
+                    f"nuclei -u {target_q} -t {templates_root} "
+                    f"-severity {severity_arg} -rate-limit 50 -timeout 10"
+                )
+
+            with st.status("Nuclei 자동 스캔 실행 중...", expanded=False):
+                result, err = execute_nuclei_command(auto_cmd)
+            if err:
+                st.error(err)
+            else:
+                st.session_state["nuclei_last_result"] = result
+                if result.get("returncode", 1) == 0:
+                    st.success("Nuclei 자동 스캔이 완료되었습니다.")
+                else:
+                    st.warning(f"Nuclei 실행은 끝났지만 오류 코드가 반환되었습니다. (rc={result.get('returncode')})")
+                st.info("아래 `실행 결과` 섹션에서 JSON/로그를 확인하세요.")
+
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+    st.markdown("### 2) 명령어 직접 실행")
+    st.caption("입력한 명령어를 로컬 터미널처럼 실행합니다. 보안을 위해 `nuclei` 명령어만 허용됩니다.")
+    st.code(
+        "사용 예시:\n"
+        "nuclei -u https://example.com -t src/dashboard_0210/nuclei-templates/http/cves -severity critical,high\n"
+        "nuclei -target 127.0.0.1 -t src/dashboard_0210/nuclei-templates/code/linux/audit -code -esc",
+        language="bash",
+    )
+    manual_cmd = st.text_input(
+        "Nuclei 명령어",
+        placeholder="nuclei -u https://target -t src/dashboard_0210/nuclei-templates/http/cves -severity critical,high",
+        key="nuclei_manual_cmd",
+    )
+    if st.button("▶ 명령어 실행", use_container_width=True, key="nuclei_manual_run"):
+        result, err = execute_nuclei_command(manual_cmd)
+        if err:
+            st.error(err)
+        else:
+            st.session_state["nuclei_last_result"] = result
+            st.success("명령어 실행이 완료되었습니다.")
+
+    result = st.session_state.get("nuclei_last_result")
+    if result:
+        st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+        st.markdown("### 실행 결과")
+        st.write(f"Return code: `{result['returncode']}`")
+        st.code(" ".join(shlex.quote(token) for token in result["cmd"]), language="bash")
+        st.caption(
+            f"JSON 건수: `{len(result.get('json', []))}` | "
+            f"STDOUT 라인: `{len((result.get('stdout') or '').splitlines())}` | "
+            f"STDERR 라인: `{len((result.get('stderr') or '').splitlines())}`"
+        )
+
+        no_findings = (
+            result.get("returncode", 1) == 0
+            and len(result.get("json", [])) == 0
+            and not (result.get("stdout") or "").strip()
+            and not (result.get("stderr") or "").strip()
+        )
+        if no_findings:
+            st.success("탐지된 취약점이 없습니다. (No findings)")
+
+        if result["json"]:
+            st.caption(f"JSON 결과 {len(result['json'])}건")
+            st.json(result["json"])
+        else:
+            st.info("JSON 결과가 없습니다. 아래 원문 로그(STDOUT/STDERR)를 확인하세요.")
+
+        if result["non_json_lines"]:
+            with st.expander("STDOUT 원문 로그", expanded=True):
+                st.code("\n".join(result["non_json_lines"]))
+        elif (result.get("stdout") or "").strip():
+            with st.expander("STDOUT 원문 로그", expanded=True):
+                st.code(result["stdout"])
+
+        if result["stderr"].strip():
+            with st.expander("STDERR 로그", expanded=True):
+                st.code(result["stderr"])
 
 # =========================================================
 # HISTORY PAGE
