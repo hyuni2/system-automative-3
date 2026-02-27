@@ -1,13 +1,14 @@
 html, body {
     height: 100%;
+    overflow-y: auto;
 }
 
 .block-container {
     display: flex;
     flex-direction: column;
-    padding-top: 0;
-    padding-left: 0;
-    padding-right: 0;
+    padding-top: 1rem !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
     padding-bottom: 0 !important;
     margin-bottom: 0 !important;
 }
@@ -292,6 +293,8 @@ body {
 section[data-testid="stAppViewContainer"] {
     padding-bottom: 0 !important;
     min-height: 100vh;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     display: flex;
     flex-direction: column;
 }
@@ -302,6 +305,11 @@ section[data-testid="stAppViewContainer"] > .block-container {
 
 section[data-testid="stMain"] {
     padding-bottom: 0 !important;
+    overflow-y: auto !important;
+}
+
+section[data-testid="stSidebar"] {
+    overflow-y: auto !important;
 }
 
 .diagnosis-wrapper {
