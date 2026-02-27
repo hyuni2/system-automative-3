@@ -14,32 +14,24 @@
 ```text
 .
 ├─ app.py                        # Streamlit 실행 엔트리포인트 (루트에서 실행)
-├─ test.sh                       # 터미널용 점검 스크립트
 ├─ install-nuclei.sh
 ├─ requirements.txt
-└─ src/
-   ├─ OS_Scripts/
-   │  ├─ RHEL-family/
-   │  │  ├─ Rocky9.sh
-   │  │  └─ Rocky10.sh
-   │  └─ Debian-family/
-   │     └─ Ubuntu24.sh
-   └─ dashboard_0210/
-      ├─ ansible.cfg
-      ├─ check_playbook.yml
-      ├─ temp_inventory.ini
-      ├─ scripts/
-      │  ├─ nuclei_check.py
-      │  ├─ rocky_check_9.sh
-      │  ├─ rocky_check_10.sh
-      │  └─ ubuntu_check.sh
-      ├─ reports/
-      ├─ history/
-      ├─ templates/
-      ├─ images/
-      ├─ fonts/
-      ├─ styles.css
-      └─ nuclei-templates/
+└─ dashboard_0210/
+   ├─ ansible.cfg
+   ├─ check_playbook.yml
+   ├─ temp_inventory.ini
+   ├─ scripts/
+   │  ├─ nuclei_check.py
+   │  ├─ rocky_check_9.sh
+   │  ├─ rocky_check_10.sh
+   │  └─ ubuntu_check.sh
+   ├─ reports/
+   ├─ history/
+   ├─ templates/
+   ├─ images/
+   ├─ fonts/
+   ├─ styles.css
+   └─ nuclei-templates/
 ```
 
 ## 스크립트 역할 정리
